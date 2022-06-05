@@ -24,8 +24,6 @@ pip2 install pillow==6.2.2
 Create catkin_workspace and build for Kookmin_AutoCon repository.
 ```Terminal
 mkdir -p ~/kookmin_ws/src
-cd kookmin_ws
-catkin_make
 cd ~/kookmin_ws/src
 git clone https://github.com/jhforstudy/2022_HEVEN_Kookmin_AutoCon.git .
 cd ..
