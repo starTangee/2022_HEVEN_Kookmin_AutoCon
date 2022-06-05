@@ -1,4 +1,5 @@
 # Tutorial for Kookmin_AutoCon prereminary assingments
+This is the simple tutorial for Kookmin university Autonomous contest preliminary assignments. You have to install some setups and build your workspace in the following workflow.
 
 ## Prerequisites
 ### Environments
