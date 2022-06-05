@@ -41,7 +41,7 @@ roslaunch rosbridge_server rosbridge_websocket.launch
 ```
 Run the simulator
 ```terminal
-cd ~/kookmin_ws/xycar_sim_driving
+cd ~/kookmin_ws/src/xycar_sim_driving
 ./xycar3dsimulator.x86_64
 ```
 Launch the driving code for assignment1
