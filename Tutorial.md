@@ -45,12 +45,14 @@ cd ~/kookmin_ws/src/xycar_sim_driving
 ```
 Launch the driving code for assignment1
 ```terminal
+source devel/setup.bash
 roslaunch assignment1 driving.launch
 ```
 
 ### Assignment2
 Launch the parking code and the simulator
 ```terminal
+source devel/setup.bash
 roslaunch assignment2 parking.launch
 ```
 
