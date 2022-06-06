@@ -36,6 +36,8 @@ If your catkin_make complete, now you are ready to launch the code.
 ### Assignment1
 Launch the rosbridge
 ```terminal
+cd ~/kookmin_ws
+source devel/setup.bash
 roslaunch rosbridge_server rosbridge_websocket.launch
 ```
 Run the simulator
