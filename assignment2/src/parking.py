@@ -48,6 +48,67 @@ def callback(msg):
         arData["AZ"] = i.pose.pose.orientation.z
         arData["AW"] = i.pose.pose.orientation.w
 
+def define_x_val(x, yaw):
+
+    # x, yaw 값은 차량의 자세에 영향이 있으므로, 이용해 angle 값을 제어한다.
+    # x, yaw 값에 따른 시나리오
+    # -----------------------
+    # 1. x > 0, yaw > 0
+    # ar tag가 차량 기준 오른쪽에 있는 반면, 차량의 자세가 오른쪽 방향에 치우쳐져 있음
+    # 따라서, 왼쪽으로 꺾기 전에 좀더 앞으로 가서 yaw 값을 0에 가깝게 해야 함 (차량을 정렬하기 위해)
+    # 2. x < 0, yaw < 0
+    # ar tag가 차량 기준 왼쪽에 있는 반면, 차량의 자세가 왼쪽 방향에 치우쳐져 있음
+    # 따라서, 오른쪽으로 꺾기 전에 좀더 앞으로 가서 yaw 값을 0에 가깝게 해야 함 (차량을 정렬하기 위해)
+    # 3. x > 0, yaw < 0
+    # ar tag가 차량 기준 오른쪽에 있으면서, 차량의 자세도 왼쪽 방향에 치우쳐져 있음
+    # 따라서, 빠르게 오른쪽으로 이동해야 함.
+    # 4. x < 0, yaw > 0
+    # ar tag가 차량 기준 왼쪽에 있으면서, 차량의 자세도 오른쪽 방향에 치우쳐져 있음
+    # 따라서, 빠르게 왼쪽으로 이동해야 함.
+    # ------------------------
+    # 결론적으로, 조향각은 x 값에 비례해서, yaw 의 음수 값에 비례해서 제어해야 함
+    # x 값에 대해 양수 P gain, yaw 값에 대해서는 음수 P gain을 줄것
+
+    k_p_x = 0.7
+    k_p_yaw = -8
+
+    final_angle = k_p_x * x + k_p_yaw * yaw
+
+    # -50 에서 50까지의 값으로 제한
+
+    if final_angle >= 50:
+        final_angle = 50
+    elif final_angle <= -50:
+        final_angle = -50
+
+    return int(final_angle)
+
+def define_y_val(y):
+
+    # y 값은 차량의 속도에 영향이 있으므로, 이용해 speed 값을 제어한다.
+    # y 값에 따른 제어 시나리오
+    # -----------------------
+    # 주차 완료 지점에서, 벽까지의 거리가 60 pixel 정도 된다.
+    # y 값이 대략 360 pixel 정도 될 때 주차구역에 근접하므로, 속도를 줄여야 한다.
+    # 따라서, y 값이 360 이상일때는 최대 속도로, 60 ~ 360 일때는 속도를 비례해서 줄인다.
+    # y 값이 60 이하가 되면, 정차한다.
+
+    if y <= 60:
+        final_vel = 0
+    elif 60 <= y <= 360:
+        final_vel = (y-60)/6
+    else:
+        final_vel = 50
+
+    # -50 에서 50까지의 값으로 제한
+
+    if final_vel >= 50:
+        final_vel = 50
+    elif final_vel <= -50:
+        final_vel = -50
+
+    return int(final_vel)
+
 #=========================================
 # ROS 노드를 생성하고 초기화 함.
 # AR Tag 토픽을 구독하고 모터 토픽을 발행할 것임을 선언
@@ -62,6 +123,7 @@ motor_pub = rospy.Publisher('xycar_motor', xycar_motor, queue_size =1 )
 # "AR정보 변환처리 +차선위치찾기 +조향각결정 +모터토픽발행" 
 # 작업을 반복적으로 수행함.
 #=========================================
+
 while not rospy.is_shutdown():
 
     # 쿼터니언 형식의 데이터를 오일러 형식의 데이터로 변환
@@ -72,6 +134,12 @@ while not rospy.is_shutdown():
     pitch = math.degrees(pitch)
     yaw = math.degrees(yaw)
     
+    # 차량으로부터 ar tag가 위치한 곳까지의 거리 (x, y) 를 받아옴.
+    x = arData["DX"]
+    y = arData["DY"]
+
+    # ============================================================================
+
     # Row 100, Column 500 크기의 배열(이미지) 준비
     img = np.zeros((100, 500, 3))
 
@@ -110,17 +178,19 @@ while not rospy.is_shutdown():
     cv2.imshow('AR Tag Position', img)
     cv2.waitKey(1)
 
-    # 핸들 조향각 angle값 설정하기
-    angle = 50
-		
-    # 차량의 속도 speed값 설정하기
-    speed = 5		
-     
+    # x, y, yaw 값을 이용해 조향각을 결정하는 부분
+    # ==================================================================
+
+    angle = define_x_val(x, yaw)
+    speed = define_y_val(y)
+
+    # 차량 제어 부분
+    # ===================================================================
+
     # 조향각값과 속도값을 넣어 모터 토픽을 발행하기
     motor_msg.angle = angle
     motor_msg.speed = speed
     motor_pub.publish(motor_msg)
-
 
 # while 루프가 끝나면 열린 윈도우 모두 닫고 깔끔하게 종료하기
 cv2.destroyAllWindows()
