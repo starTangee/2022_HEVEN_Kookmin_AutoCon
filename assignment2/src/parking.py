@@ -30,6 +30,20 @@ arData = {"DX":0.0, "DY":0.0, "DZ":0.0,
 roll, pitch, yaw = 0, 0, 0
 motor_msg = xycar_motor()
 
+# 각종 제어 계수
+CAR_SPEED = 50
+X_P_GAIN = 0.7
+YAW_P_GAIN = -8
+ROTATING_TRIG_CNT = 300
+REPEAT_INTERVAL = 300
+
+# 차량이 ar Tag를 놓쳤는지 확인하기 위한 Trigger
+check_rotating = False
+rotating_cnt = 0
+prev_y = 0
+rotating_clk = 0
+#=============================================  
+
 #=============================================
 # 콜백함수 - ar_pose_marker 토픽을 처리하는 콜백함수
 # ar_pose_marker 토픽이 도착하면 자동으로 호출되는 함수
@@ -48,42 +62,41 @@ def callback(msg):
         arData["AZ"] = i.pose.pose.orientation.z
         arData["AW"] = i.pose.pose.orientation.w
 
-def define_x_val(x, yaw):
+def limit_value(x, min=-50, max=50):
+
+    if x >= max:
+        x = max
+    
+    elif x <= min:
+        x = min
+
+    return x
+
+def determ_control(x, y, yaw):
 
     # x, yaw 값은 차량의 자세에 영향이 있으므로, 이용해 angle 값을 제어한다.
     # x, yaw 값에 따른 시나리오
-    # -----------------------
+    #=============================================
     # 1. x > 0, yaw > 0
-    # ar tag가 차량 기준 오른쪽에 있는 반면, 차량의 자세가 오른쪽 방향에 치우쳐져 있음
-    # 따라서, 왼쪽으로 꺾기 전에 좀더 앞으로 가서 yaw 값을 0에 가깝게 해야 함 (차량을 정렬하기 위해)
-    # 2. x < 0, yaw < 0
-    # ar tag가 차량 기준 왼쪽에 있는 반면, 차량의 자세가 왼쪽 방향에 치우쳐져 있음
+    # ar tag가 차량 기준 오른쪽에 있는 반면, 차량의 자세가 tag의 왼쪽 방향으로 틀어져 있음
     # 따라서, 오른쪽으로 꺾기 전에 좀더 앞으로 가서 yaw 값을 0에 가깝게 해야 함 (차량을 정렬하기 위해)
+    # 2. x < 0, yaw < 0
+    # ar tag가 차량 기준 왼쪽에 있는 반면, 차량의 자세가 tag의 오른쪽 방향으로 틀어져 있음
+    # 따라서, 왼쪽으로 꺾기 전에 좀더 앞으로 가서 yaw 값을 0에 가깝게 해야 함 (차량을 정렬하기 위해)
     # 3. x > 0, yaw < 0
     # ar tag가 차량 기준 오른쪽에 있으면서, 차량의 자세도 왼쪽 방향에 치우쳐져 있음
     # 따라서, 빠르게 오른쪽으로 이동해야 함.
     # 4. x < 0, yaw > 0
     # ar tag가 차량 기준 왼쪽에 있으면서, 차량의 자세도 오른쪽 방향에 치우쳐져 있음
     # 따라서, 빠르게 왼쪽으로 이동해야 함.
-    # ------------------------
+    #=============================================
     # 결론적으로, 조향각은 x 값에 비례해서, yaw 의 음수 값에 비례해서 제어해야 함
     # x 값에 대해 양수 P gain, yaw 값에 대해서는 음수 P gain을 줄것
 
-    k_p_x = 0.7
-    k_p_yaw = -8
+    k_p_x = X_P_GAIN
+    k_p_yaw = YAW_P_GAIN
 
     final_angle = k_p_x * x + k_p_yaw * yaw
-
-    # -50 에서 50까지의 값으로 제한
-
-    if final_angle >= 50:
-        final_angle = 50
-    elif final_angle <= -50:
-        final_angle = -50
-
-    return int(final_angle)
-
-def define_y_val(y):
 
     # y 값은 차량의 속도에 영향이 있으므로, 이용해 speed 값을 제어한다.
     # y 값에 따른 제어 시나리오
@@ -93,21 +106,16 @@ def define_y_val(y):
     # 따라서, y 값이 360 이상일때는 최대 속도로, 60 ~ 360 일때는 속도를 비례해서 줄인다.
     # y 값이 60 이하가 되면, 정차한다.
 
+    # y 값이 양수인 경우
+    # 거리에 맞게 속도를 조절하면 됨
     if y <= 60:
         final_vel = 0
     elif 60 <= y <= 360:
-        final_vel = (y-60)/6
+        final_vel = (y-60)/300*CAR_SPEED
     else:
-        final_vel = 50
+        final_vel = CAR_SPEED
 
-    # -50 에서 50까지의 값으로 제한
-
-    if final_vel >= 50:
-        final_vel = 50
-    elif final_vel <= -50:
-        final_vel = -50
-
-    return int(final_vel)
+    return int(final_angle), int(final_vel)
 
 #=========================================
 # ROS 노드를 생성하고 초기화 함.
@@ -138,8 +146,8 @@ while not rospy.is_shutdown():
     x = arData["DX"]
     y = arData["DY"]
 
+    # 제어값 이미지 표시
     # ============================================================================
-
     # Row 100, Column 500 크기의 배열(이미지) 준비
     img = np.zeros((100, 500, 3))
 
@@ -177,25 +185,80 @@ while not rospy.is_shutdown():
     # 만들어진 그림(이미지)을 모니터에 디스플레이 하기
     cv2.imshow('AR Tag Position', img)
     cv2.waitKey(1)
+    # ===================================================================
 
-    # x, y, yaw 값을 이용해 조향각을 결정하는 부분
+    # x, y, yaw 값을 이용해 제어값을 결정하는 부분
+    # ==================================================================
+    angle, speed  = determ_control(x, y, yaw)
     # ==================================================================
 
-    angle = define_x_val(x, yaw)
-    speed = define_y_val(y)
+    # 차량이 ar tag를 놓치고 회전하고 있는지 확인
+    # ==================================================================
+    # 일반적인 주행상황
+    if not check_rotating:
+        # ar tag를 놓치고 회전하고 있는지 검사
+        # 이전 y 값과 같게 들어오면,
+        if prev_y == y:
+            # 카운트
+            rotating_cnt += 1
+
+        # 만약 카운트가 특정 숫자 넘으면, ar tag를 놓치고 회전하고 있는 것으로 판단
+        if rotating_cnt >= ROTATING_TRIG_CNT:
+            # Trigger 발동
+            check_rotating = True
+            rotating_clk = 0
+
+    # 회전하고 있는 상황
+    else:
+        # 속도의 경우, 차량을 왔다갔다 하면서 회전시켜야 함.
+        # 클락이 N초 단위를 지날때 마다 앞으로 뒤로를 반복
+        if int(rotating_clk / REPEAT_INTERVAL) % 2 == 0:
+            # tag가 차량의 오른쪽 방향으로 사라졌다면, 오른쪽에 있을 것이므로 차량을 오른쪽으로 회전
+            if x >= 0:
+                angle = 50
+            # 아니면, 반대쪽
+            else:
+                angle = -50
+            speed = 20
+
+        else:
+            # 뒤로 갈때는, 반대 방향으로 조향
+            if x >= 0:
+                angle = -50
+            else:
+                angle = 50
+
+            # 이때 속도는, y값이 작을수록 자세가 흐트려진 상태로 벽 근처에 있음을 의미함
+            # 따라서 y가 작을수록 더 많이 뒤로 가야함
+            speed = -20*(800/y)
+
+        # 만약 ar tag가 발견되어 다른 y 값이 들어오면
+        if prev_y != y:
+            # Trigger 해제
+            check_rotating = False
+            # 카운트를 다시 0으로
+            rotating_cnt = 0
+            rotating_clk = 0
+
+        # 회전하고 있는 상황에서 클락 카운트
+        rotating_clk += 1
+    # ===================================================================
 
     # 차량 제어 부분
     # ===================================================================
+    # -50 에서 50까지의 값으로 제한
+    angle = limit_value(angle, -50, 50)
+    speed = limit_value(speed, -50, 50)
 
     # 조향각값과 속도값을 넣어 모터 토픽을 발행하기
     motor_msg.angle = angle
     motor_msg.speed = speed
     motor_pub.publish(motor_msg)
 
+    # 이전 y 값 저장
+    prev_y = y
+    # ===================================================================
+
 # while 루프가 끝나면 열린 윈도우 모두 닫고 깔끔하게 종료하기
 cv2.destroyAllWindows()
-
-
-
-
 
