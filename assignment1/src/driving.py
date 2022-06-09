@@ -468,17 +468,16 @@ bridge = CvBridge()
 motor = None 
 
 CAM_FPS = 30    
-WIDTH, HEIGHT = 640, 480    
+WIDTH, HEIGHT = 640, 480
+
 
 def img_callback(data):
     global image
     image = bridge.imgmsg_to_cv2(data, "bgr8")
 
-
 def drive(angle_input, speed_input):
-
     global motor
-    global angle, speed
+    
     motor_msg = xycar_motor()
     motor_msg.angle = angle_input
     motor_msg.speed = speed_input
@@ -532,7 +531,6 @@ def is_right_lane(frame):
     else:
         False
 
-
 def region_of_interest(img, vertices, color3=(255,255,255), color1=255): # ROI 셋팅
 
     mask = np.zeros_like(img) # mask = img와 같은 크기의 빈 이미지
@@ -550,90 +548,19 @@ def region_of_interest(img, vertices, color3=(255,255,255), color1=255): # ROI �
     return ROI_image
 
 def search_camera(frame):
-    for i in range(10):
-        if not no_white(frame,"right") and not no_white(frame,"left"):
-            print("search the lane!")
-            drive(i*2,6)    
-            return
-        drive(i*2,3)
-        time.sleep(0.1)
-    for i in range(10):
-        if not no_white(frame,"right") and not no_white(frame,"left"):
-            print("search the lane!")
-            drive(-i*2,6)
-            return
-        drive(-i*2,3)
-        time.sleep(0.1)
-        
-def drive_along_right(frame):
-    print("driving along right lane")
-    while no_white(frame,"right"):
-        drive(-21,10)
-        print("no_white so driving")
-    search_camera
-        
-    
-    # while not no_white(frame, "right") and no_white(frame,"left"):
-    
-        # if is_right_lane(frame):
-        #     drive(0,10)
-        #     return
-        # else:
-        #     angle=0
-        #     if angle>-16:
-        #         angle-=3
-        #     drive(angle,3)
-        
-        #     drive(0,10)
-        #     time.sleep(0.1)
-        
 
-def follow_center(deviation):
-    if deviation>0:
-        
-        drive(15,12)
-        time.sleep(0.1)
-        drive(15,12)
-        time.sleep(0.1)
-        drive(15,12)
-        time.sleep(0.1)
-        drive(10,12)
-        time.sleep(0.1)
-        drive(2,12)
-        time.sleep(0.1)
-        drive(-8,12)
-        time.sleep(0.1)
-        drive(-15,12)
-        time.sleep(0.1)
-        drive(-8,12)
-        time.sleep(0.1)
-        drive(-8,12)
-        time.sleep(0.1)
-        drive(-0,12)
-        print("follow to right")
-    elif deviation<0:
-        
-        drive(-15,12)
-        time.sleep(0.1)
-        drive(-15,12)
-        time.sleep(0.1)
-        drive(-15,12)
-        time.sleep(0.1)
-        drive(-10,12)
-        time.sleep(0.1)
-        drive(-2,12)
-        time.sleep(0.1)
-        drive(8,12)
-        time.sleep(0.1)
-        drive(15,12)
-        time.sleep(0.1)
-        drive(8,12)
-        time.sleep(0.1)
-        drive(0,12)
-        time.sleep(0.1)
-        drive(8,12)
-        print("follow to left")
+    # Make a random integer 0 ~ 20
+    rand_num = int((rospy.get_time() * 10) % 20)
 
+    # Map to -10 ~ 10
+    rand = (rand_num - 10)
+
+    if not no_white(frame,"right") and not no_white(frame,"left"):
+        print("search the lane!")
+        drive(rand,6)
+        return
+
+    drive(rand,3)
 
 def start():
 
@@ -642,6 +569,7 @@ def start():
     rospy.init_node('driving')
     motor = rospy.Publisher('xycar_motor', xycar_motor, queue_size=1)
     image_sub = rospy.Subscriber("/usb_cam/image_raw/",Image,img_callback)
+    rate = rospy.Rate(100)
 
     print ("----- Xycar self driving -----")
 
@@ -652,10 +580,13 @@ def start():
     speed=15
     x_list=[]
     y_list=[]
-    follow=0
+    follow_center_trig_list = [15,15,12,12,9,9,6,6,3,3,0,0,-3,-3,-6,-6,-9,-9,-12,-12,-15,-15]
+
+    follow_center_trig = False
 
     while not rospy.is_shutdown():
         try:
+
             frame = image.copy()  
             
             #  BGR 제한 값 설정
@@ -702,9 +633,7 @@ def start():
             draw_info = general_search(thresh, left_fit, right_fit)
             # plt.show()
 
-
             curveRad, curveDir = measure_lane_curvature(ploty, left_fitx, right_fitx)
-
 
             # Filling the area of detected lanes with green
             meanPts, result = draw_lane_lines(frame, thresh, minverse, draw_info)
@@ -713,44 +642,49 @@ def start():
 
 
             # Adding text to our final image
+            # ====================================================================
             finalImg = addText(result, curveRad, curveDir, deviation, directionDev)
 
             # Displaying final image
             cv2.imshow("Final", finalImg)
 
-
             # Wait for the ENTER key to be pressed to stop playback
             if cv2.waitKey(1) == 13:
                 break
 
-            # cv2.imshow("CAM View", img)
-            # cv2.waitKey(1)
             x=math.atan(35/curveRad)
-            delta = int(math.degrees(x)) #30 and +0.04 rad
+            delta = int(math.degrees(x)) # 30 and +0.04 rad
             if delta>12:delta=12
             y=delta
             x_list.append(x)
             y_list.append(y)
+            # ====================================================================
             
-            
-            # if delta>10:delta=15
-            # elif delta>6:delta=10
-            # if delta>16:delta=16
-            # if angle<delta:
-            #     angle+=1
-            
+            # Exception 1
+            # ====================================================================
+            # If not following center,
+            if not follow_center_trig:
+                # If the car is too far from center,
+                if abs(deviation)>0.2 and abs(deviation)<1.0 and base_dist>350:
+                    print("fall from center!")
+                    follow_center_trig = True
+                    follow_center_cnt = 0
+                    if deviation <= 0:
+                        follow_center_trig_list.reverse()
+                        print("follow to right!")
+                    else:
+                        print("follow to left!")
 
-            if abs(deviation)>0.2 and abs(deviation)<1.0 and base_dist>350:
-                print("fall from center!")
-                follow_center(deviation)
-                for i in range(follow):
-                    follow_center(deviation)
-                follow=0
-                continue
-            follow=0    
-            # print("atan value :",math.degrees(math.atan(40/curveRad)))
+            else:
+                if follow_center_cnt == len(follow_center_trig_list):
+                    follow_center_trig = False
+                angle = follow_center_trig_list[follow_center_cnt]
+                speed = 12
+            # ====================================================================
 
-            if no_white(frame,"right"): # drive right : positive angle
+            # Exception 2
+            # ====================================================================
+            '''if no_white(frame,"right"): # drive right : positive angle
                 print("no white area on right side")
                 if angle<0:angle=0
                 if obstruct_way(frame):
@@ -761,35 +695,46 @@ def start():
 
             elif no_white(frame,"left"):  # drive left : negative angle
                 print("no white area on left side")
-                drive_along_right(frame)
+                print("driving along right lane")
+                while no_white(frame,"right"):
+                    drive(-21,10)
+                    print("no_white so driving")
+                search_camera  
                 if angle>0:angle=0
                 if obstruct_way(frame):
                     if angle>-24:angle-=3
                 if angle>-12:angle-=3
                 if speed>10:
-                    speed-=2
-            
-            else:
-                if base_dist<350:
-                    print("detected area has something wrong!")
-                    search_camera(frame)
-                    continue
-                if directionDev=="right": # drive left : negative angle
-                    if angle>0:angle=0
-                    if angle>=-delta:
-                        angle-=3
-                    else:angle+=3
-                    if delta<=4:angle=0
-                    
-                    
-                elif directionDev=="left": # drive right : positive angle
-                    if angle<0:angle=0
-                    if angle<=delta:
-                        angle+=3
-                    else: angle-=3
-                    if delta<=4:angle=0
-                speed=20
-            
+                    speed-=2'''
+            # ====================================================================
+
+            # Generally determine angle
+            # ====================================================================
+            # else:
+            speed=20
+            if base_dist<350:
+                '''print("detected area has something wrong!")
+                search_camera(frame)
+                continue'''
+                pass
+
+            if directionDev=="right": # drive left : negative angle
+                if angle>0 or delta<=2:
+                    angle += 0
+                else:
+                    angle = delta*1.5
+                
+            elif directionDev=="left": # drive right : positive angle
+                if angle<0 or delta<=2:
+                    angle+=0
+                else:
+                    angle = delta*1.5
+
+            # ====================================================================
+
+            if angle >= 10 or angle <= -10:
+                speed -= 10
+
             print("=====drive info=====")
             print("base_dist :",base_dist)
             print("deviation :",deviation)
@@ -804,31 +749,8 @@ def start():
             plt.axis([0,1,0,18])
             # plt.pause(0.01)
 
-        # except TypeError as t:
-        #     if base_dist>350:
-        #         continue
-        #     if obstruct_way(frame):
-        #         print("lane in right")
-        #         drive(-30,8)
-        #     search_camera(frame)
-        #     continue
-        #     # follow=3
-        #     # for i in range(10):
-        #     #     drive(-30,8)    
-        #     #     time.sleep(0.1)
-        #     # for i in range(50):
-        #     #     drive(0,8)    
-        #     #     time.sleep(0.1)
-        #     # continue
-        #     # drive_along_right(frame)
-        #     # if no_white(frame, "left"):
-        #     #     for i in range(15):
-        #     #         drive(-15,20)
-        #     #         time.sleep(0.1)
-        #     # elif no_white(frame, "right"):
-        #     #     for i in range(15):
-        #     #         drive(15,20)
-        #     #         time.sleep(0.1)
+            rate.sleep()
+
         except Exception as e:
             print(traceback.format_exc())
             # print("error occured!")
