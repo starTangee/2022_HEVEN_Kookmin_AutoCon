@@ -14,6 +14,7 @@ import os
 import random
 from scipy import optimize
 from matplotlib import pyplot as plt, cm, colors
+import traceback
 
 # Defining variables to hold meter-to-pixel conversion
 ym_per_pix = 30.0 / 720
@@ -83,7 +84,6 @@ def perspectiveWarp(inpImage):
     # Perspective points to be warped
     height=img_size[1]
     width=img_size[0]
-
 
 
     src = np.float32([[80, 330],
@@ -169,7 +169,8 @@ def plotHistogram(inpImage):
 ################################################################################
 
 
-
+left_fit_backup=0
+right_fit_backup=0
 ################################################################################
 #### START - APPLY SLIDING WINDOW METHOD TO DETECT CURVES ######################
 def slide_window_search(binary_warped, histogram):
@@ -179,7 +180,8 @@ def slide_window_search(binary_warped, histogram):
     midpoint = np.int(histogram.shape[0] / 2)
     leftx_base = np.argmax(histogram[:midpoint])
     rightx_base = np.argmax(histogram[midpoint:]) + midpoint
-
+    global left_fit_backup, right_fit_backup
+    
     # A total of 9 windows will be used
     nwindows = 9
     window_height = np.int(binary_warped.shape[0] / nwindows)
@@ -227,16 +229,20 @@ def slide_window_search(binary_warped, histogram):
 
     # Apply 2nd degree polynomial fit to fit curves
     if len(leftx)==0 or len(lefty)==0:
-        print("if statement")
-        left_fit = None
+        # print("if statement")
+        left_fit=left_fit_backup
+        
     else:
         left_fit = np.polyfit(lefty, leftx, 2)
-    if rightx is None or righty is None:
-        right_fit = None
+        left_fit_backup=left_fit
+        
+    if len(rightx)==0 or len(righty)==0:
+        right_fit=right_fit_backup
+
     else:
         right_fit = np.polyfit(righty, rightx, 2)
-
-
+        right_fit_backup=right_fit
+    # print("no error in if state")
     ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0])
     left_fitx = left_fit[0] * ploty**2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty**2 + right_fit[1] * ploty + right_fit[2]
@@ -260,11 +266,12 @@ def slide_window_search(binary_warped, histogram):
 ################################################################################
 
 
-
+left_fit_general=0
+right_fit_general=0
 ################################################################################
 #### START - APPLY GENERAL SEARCH METHOD TO DETECT CURVES ######################
 def general_search(binary_warped, left_fit, right_fit):
-
+    global left_fit_general, right_fit_general
     nonzero = binary_warped.nonzero()
     nonzeroy = np.array(nonzero[0])
     nonzerox = np.array(nonzero[1])
@@ -281,8 +288,24 @@ def general_search(binary_warped, left_fit, right_fit):
     lefty = nonzeroy[left_lane_inds]
     rightx = nonzerox[right_lane_inds]
     righty = nonzeroy[right_lane_inds]
-    left_fit = np.polyfit(lefty, leftx, 2)
-    right_fit = np.polyfit(righty, rightx, 2)
+
+
+    if len(leftx)==0 or len(lefty)==0:
+        left_fit=left_fit_general
+        
+    else:
+        left_fit = np.polyfit(lefty, leftx, 2)
+        left_fit_general=left_fit
+        
+    if len(rightx)==0 or len(righty)==0:
+        right_fit=right_fit_general
+
+    else:
+        right_fit = np.polyfit(righty, rightx, 2)
+        right_fit_general=right_fit
+
+    # left_fit = np.polyfit(lefty, leftx, 2)
+    # right_fit = np.polyfit(righty, rightx, 2)
     ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0])
     left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
     right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
@@ -452,13 +475,13 @@ def img_callback(data):
     image = bridge.imgmsg_to_cv2(data, "bgr8")
 
 
-def drive(angle, speed):
+def drive(angle_input, speed_input):
 
     global motor
-
+    global angle, speed
     motor_msg = xycar_motor()
-    motor_msg.angle = angle
-    motor_msg.speed = speed
+    motor_msg.angle = angle_input
+    motor_msg.speed = speed_input
 
     motor.publish(motor_msg)
 
@@ -473,6 +496,38 @@ def no_white(frame,side):
     roi_frame=region_of_interest(gray_frame,vertices)
     white_len = len(roi_frame[roi_frame==255]) # find only white
     if white_len<300:
+        return True
+    else:
+        False
+
+def obstruct_way(frame):
+    height=480
+    width=640
+    gray_frame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+    vertices = np.array([[(80,height-150),(width-80, height-150), (80, height-120), (width-80,height-120)]], dtype=np.int32)
+    
+    roi_frame=region_of_interest(gray_frame,vertices)
+    obstruct_way_len = len(roi_frame[roi_frame==255]) # find only white
+    if obstruct_way_len>800:
+        print("obstructed by way!")
+        print(obstruct_way_len)
+        
+        return True
+    else:
+        False
+
+def is_right_lane(frame):
+    height=480
+    width=640
+    gray_frame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+    vertices = np.array([[(width-40,height),(width-80, height), (width-80, height-200), (width-40,height-200)]], dtype=np.int32)
+    
+    roi_frame=region_of_interest(gray_frame,vertices)
+    right_lane_len = len(roi_frame[roi_frame==255]) # find only white
+    if right_lane_len>2000:
+        print("right_lane_len exist!")
+        print(right_lane_len)
+        
         return True
     else:
         False
@@ -494,6 +549,91 @@ def region_of_interest(img, vertices, color3=(255,255,255), color1=255): # ROI ì
     ROI_image = cv2.bitwise_and(img, mask)
     return ROI_image
 
+def search_camera(frame):
+    for i in range(10):
+        if not no_white(frame,"right") and not no_white(frame,"left"):
+            print("search the lane!")
+            drive(i*2,6)    
+            return
+        drive(i*2,3)
+        time.sleep(0.1)
+    for i in range(10):
+        if not no_white(frame,"right") and not no_white(frame,"left"):
+            print("search the lane!")
+            drive(-i*2,6)
+            return
+        drive(-i*2,3)
+        time.sleep(0.1)
+        
+def drive_along_right(frame):
+    print("driving along right lane")
+    while no_white(frame,"right"):
+        drive(-21,10)
+        print("no_white so driving")
+    search_camera
+        
+    
+    # while not no_white(frame, "right") and no_white(frame,"left"):
+    
+        # if is_right_lane(frame):
+        #     drive(0,10)
+        #     return
+        # else:
+        #     angle=0
+        #     if angle>-16:
+        #         angle-=3
+        #     drive(angle,3)
+        
+        #     drive(0,10)
+        #     time.sleep(0.1)
+        
+
+def follow_center(deviation):
+    if deviation>0:
+        
+        drive(15,12)
+        time.sleep(0.1)
+        drive(15,12)
+        time.sleep(0.1)
+        drive(15,12)
+        time.sleep(0.1)
+        drive(10,12)
+        time.sleep(0.1)
+        drive(2,12)
+        time.sleep(0.1)
+        drive(-8,12)
+        time.sleep(0.1)
+        drive(-15,12)
+        time.sleep(0.1)
+        drive(-8,12)
+        time.sleep(0.1)
+        drive(-8,12)
+        time.sleep(0.1)
+        drive(-0,12)
+        print("follow to right")
+    elif deviation<0:
+        
+        drive(-15,12)
+        time.sleep(0.1)
+        drive(-15,12)
+        time.sleep(0.1)
+        drive(-15,12)
+        time.sleep(0.1)
+        drive(-10,12)
+        time.sleep(0.1)
+        drive(-2,12)
+        time.sleep(0.1)
+        drive(8,12)
+        time.sleep(0.1)
+        drive(15,12)
+        time.sleep(0.1)
+        drive(8,12)
+        time.sleep(0.1)
+        drive(0,12)
+        time.sleep(0.1)
+        drive(8,12)
+        print("follow to left")
+
 
 def start():
 
@@ -510,7 +650,10 @@ def start():
 
     angle=0
     speed=15
- 
+    x_list=[]
+    y_list=[]
+    follow=0
+
     while not rospy.is_shutdown():
         try:
             frame = image.copy()  
@@ -544,6 +687,8 @@ def start():
             # Provide this function with:
             # 1- an image to calculate histogram on (thresh)
             hist, leftBase, rightBase = plotHistogram(thresh)
+            base_dist=rightBase-leftBase
+            
             # print(rightBase - leftBase)
             plt.plot(hist)
             # plt.show()
@@ -564,7 +709,6 @@ def start():
             # Filling the area of detected lanes with green
             meanPts, result = draw_lane_lines(frame, thresh, minverse, draw_info)
 
-
             deviation, directionDev = offCenter(meanPts, frame)
 
 
@@ -581,39 +725,55 @@ def start():
 
             # cv2.imshow("CAM View", img)
             # cv2.waitKey(1)
-
-            delta = int(math.degrees(math.atan(30/curveRad)+0.015))#30 and +0.04 rad
-            x=math.atan(30/curveRad)+0.015
+            x=math.atan(35/curveRad)
+            delta = int(math.degrees(x)) #30 and +0.04 rad
+            if delta>12:delta=12
             y=delta
+            x_list.append(x)
+            y_list.append(y)
             
             
-            
-            if delta>10:delta=15
-            elif delta>6:delta=10
+            # if delta>10:delta=15
+            # elif delta>6:delta=10
             # if delta>16:delta=16
             # if angle<delta:
             #     angle+=1
             
 
-            # if deviation>1:
-            #     angle=20
+            if abs(deviation)>0.2 and abs(deviation)<1.0 and base_dist>350:
+                print("fall from center!")
+                follow_center(deviation)
+                for i in range(follow):
+                    follow_center(deviation)
+                follow=0
+                continue
+            follow=0    
             # print("atan value :",math.degrees(math.atan(40/curveRad)))
-            
+
             if no_white(frame,"right"): # drive right : positive angle
                 print("no white area on right side")
                 if angle<0:angle=0
-                if angle<15:angle+=3
-                if speed>8:
+                if obstruct_way(frame):
+                    if angle<21:angle+=3
+                if angle<12:angle+=3
+                if speed>10:
                     speed-=2
 
             elif no_white(frame,"left"):  # drive left : negative angle
                 print("no white area on left side")
+                drive_along_right(frame)
                 if angle>0:angle=0
-                if angle>-15:angle-=3
-                if speed>8:
+                if obstruct_way(frame):
+                    if angle>-24:angle-=3
+                if angle>-12:angle-=3
+                if speed>10:
                     speed-=2
             
             else:
+                if base_dist<350:
+                    print("detected area has something wrong!")
+                    search_camera(frame)
+                    continue
                 if directionDev=="right": # drive left : negative angle
                     if angle>0:angle=0
                     if angle>=-delta:
@@ -628,25 +788,51 @@ def start():
                         angle+=3
                     else: angle-=3
                     if delta<=4:angle=0
-                speed=15
-                if angle>15:
-                    if speed>8:
-                        speed-=1
+                speed=20
             
             print("=====drive info=====")
+            print("base_dist :",base_dist)
+            print("deviation :",deviation)
             print("delta :",delta)
             print("angle :",angle)
             print("speed :",speed)
 
             drive(angle, speed)
-            plt.cla()
+            # plt.cla()
             # fig1, ax1 = plt.subplots()
-            plt.plot(x, y, 'bo')
+            plt.plot(x_list, y_list, 'bo')
             plt.axis([0,1,0,18])
-            plt.pause(0.01)
+            # plt.pause(0.01)
+
+        # except TypeError as t:
+        #     if base_dist>350:
+        #         continue
+        #     if obstruct_way(frame):
+        #         print("lane in right")
+        #         drive(-30,8)
+        #     search_camera(frame)
+        #     continue
+        #     # follow=3
+        #     # for i in range(10):
+        #     #     drive(-30,8)    
+        #     #     time.sleep(0.1)
+        #     # for i in range(50):
+        #     #     drive(0,8)    
+        #     #     time.sleep(0.1)
+        #     # continue
+        #     # drive_along_right(frame)
+        #     # if no_white(frame, "left"):
+        #     #     for i in range(15):
+        #     #         drive(-15,20)
+        #     #         time.sleep(0.1)
+        #     # elif no_white(frame, "right"):
+        #     #     for i in range(15):
+        #     #         drive(15,20)
+        #     #         time.sleep(0.1)
         except Exception as e:
+            print(traceback.format_exc())
             # print("error occured!")
-            print(e)
+            # print(e)
             drive(angle, speed)
             continue
 
