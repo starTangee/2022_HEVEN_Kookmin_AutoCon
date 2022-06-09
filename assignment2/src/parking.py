@@ -63,7 +63,7 @@ def callback(msg):
         arData["AW"] = i.pose.pose.orientation.w
 
 def limit_value(x, min=-50, max=50):
-
+    # min과 max 범위를 넘을 경우, 값을 제한함.
     if x >= max:
         x = max
     
@@ -116,6 +116,59 @@ def determ_control(x, y, yaw):
         final_vel = CAR_SPEED
 
     return int(final_angle), int(final_vel)
+
+def check_rotate(chk_rot, rot_cnt, rot_clk, angle, speed):
+
+    # 일반적인 주행상황
+    if not chk_rot:
+        # ar tag를 놓치고 회전하고 있는지 검사
+        # 이전 y 값과 같게 들어오면,
+        if prev_y == y:
+            # 카운트
+            rot_cnt += 1
+
+        # 만약 카운트가 특정 숫자 넘으면, ar tag를 놓치고 회전하고 있는 것으로 판단
+        if rot_cnt >= ROTATING_TRIG_CNT:
+            # Trigger 발동
+            chk_rot = True
+            rot_clk = 0
+
+    # 회전하고 있는 상황
+    else:
+        # 속도의 경우, 차량을 왔다갔다 하면서 회전시켜야 함.
+        # 클락이 N초 단위를 지날때 마다 앞으로 뒤로를 반복
+        if int(rot_clk / REPEAT_INTERVAL) % 2 == 0:
+            # tag가 차량의 오른쪽 방향으로 사라졌다면, 오른쪽에 있을 것이므로 차량을 오른쪽으로 회전
+            if x >= 0:
+                angle = 50
+            # 아니면, 반대쪽
+            else:
+                angle = -50
+            speed = 20
+
+        else:
+            # 뒤로 갈때는, 반대 방향으로 조향
+            if x >= 0:
+                angle = -50
+            else:
+                angle = 50
+
+            # 이때 속도는, y값이 작을수록 자세가 흐트려진 상태로 벽 근처에 있음을 의미함
+            # 따라서 y가 작을수록 더 많이 뒤로 가야함
+            speed = -20*(800/y)
+
+        # 만약 ar tag가 발견되어 다른 y 값이 들어오면
+        if prev_y != y:
+            # Trigger 해제
+            chk_rot = False
+            # 카운트를 다시 0으로
+            rot_cnt = 0
+            rot_clk = 0
+
+        # 회전하고 있는 상황에서 클락 카운트
+        rot_clk += 1
+
+    return chk_rot, rot_cnt, rot_clk, angle, speed
 
 #=========================================
 # ROS 노드를 생성하고 초기화 함.
@@ -194,55 +247,8 @@ while not rospy.is_shutdown():
 
     # 차량이 ar tag를 놓치고 회전하고 있는지 확인
     # ==================================================================
-    # 일반적인 주행상황
-    if not check_rotating:
-        # ar tag를 놓치고 회전하고 있는지 검사
-        # 이전 y 값과 같게 들어오면,
-        if prev_y == y:
-            # 카운트
-            rotating_cnt += 1
-
-        # 만약 카운트가 특정 숫자 넘으면, ar tag를 놓치고 회전하고 있는 것으로 판단
-        if rotating_cnt >= ROTATING_TRIG_CNT:
-            # Trigger 발동
-            check_rotating = True
-            rotating_clk = 0
-
-    # 회전하고 있는 상황
-    else:
-        # 속도의 경우, 차량을 왔다갔다 하면서 회전시켜야 함.
-        # 클락이 N초 단위를 지날때 마다 앞으로 뒤로를 반복
-        if int(rotating_clk / REPEAT_INTERVAL) % 2 == 0:
-            # tag가 차량의 오른쪽 방향으로 사라졌다면, 오른쪽에 있을 것이므로 차량을 오른쪽으로 회전
-            if x >= 0:
-                angle = 50
-            # 아니면, 반대쪽
-            else:
-                angle = -50
-            speed = 20
-
-        else:
-            # 뒤로 갈때는, 반대 방향으로 조향
-            if x >= 0:
-                angle = -50
-            else:
-                angle = 50
-
-            # 이때 속도는, y값이 작을수록 자세가 흐트려진 상태로 벽 근처에 있음을 의미함
-            # 따라서 y가 작을수록 더 많이 뒤로 가야함
-            speed = -20*(800/y)
-
-        # 만약 ar tag가 발견되어 다른 y 값이 들어오면
-        if prev_y != y:
-            # Trigger 해제
-            check_rotating = False
-            # 카운트를 다시 0으로
-            rotating_cnt = 0
-            rotating_clk = 0
-
-        # 회전하고 있는 상황에서 클락 카운트
-        rotating_clk += 1
-    # ===================================================================
+    check_rotating, rotating_cnt, rotating_clk, angle, speed = check_rotate(check_rotating, rotating_cnt, rotating_clk, angle, speed)
+    # ==================================================================
 
     # 차량 제어 부분
     # ===================================================================
