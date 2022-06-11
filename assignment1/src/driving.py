@@ -351,7 +351,7 @@ def general_search(binary_warped, left_fit, right_fit):
 
 ################################################################################
 #### START - FUNCTION TO MEASURE CURVE RADIUS ##################################
-def measure_lane_curvature(ploty, leftx, rightx):
+def measure_lane_curvature(ploty, leftx, rightx, detect_cond=0):
 
     leftx = leftx[::-1]  # Reverse to match top-to-bottom in y
     rightx = rightx[::-1]  # Reverse to match top-to-bottom in y
@@ -377,7 +377,7 @@ def measure_lane_curvature(ploty, leftx, rightx):
     else:
         curve_direction = 'Straight'
 
-    return (left_curverad + right_curverad) / 2.0, curve_direction
+    return (left_curverad + right_curverad) / 2.0, curve_direction, left_curverad, right_curverad
 #### END - FUNCTION TO MEASURE CURVE RADIUS ####################################
 ################################################################################
 
@@ -550,19 +550,19 @@ def region_of_interest(img, vertices, color3=(255,255,255), color1=255): # ROI ì
     return ROI_image
 
 def search_camera(frame):
-    for i in range(10):
-        if not no_white(frame,"right") and not no_white(frame,"left"):
-            print("search the lane!")
+    for i in range(5):
+        '''if not no_white(frame,"right"):
+            print("search the lane!, right")
             drive(i*2,6)    
-            return
-        drive(i*2,3)
+            return'''
+        drive(-i*2,6)
         time.sleep(0.1)
-    for i in range(10):
-        if not no_white(frame,"right") and not no_white(frame,"left"):
-            print("search the lane!")
+    for i in range(5):
+        '''if not no_white(frame,"left"):
+            print("search the lane!, left")
             drive(-i*2,6)
-            return
-        drive(-i*2,3)
+            return'''
+        drive(i*2,6)
         time.sleep(0.1)
         
 def drive_along_right(frame):
@@ -570,10 +570,10 @@ def drive_along_right(frame):
     while no_white(frame,"right"):
         drive(-21,10)
         print("no_white so driving")
-    search_camera
+    search_camera(frame)
         
     
-    # while not no_white(frame, "right") and no_white(frame,"left"):
+    # while not no_white(frame, "right") and no _white(frame,"left"):
     
         # if is_right_lane(frame):
         #     drive(0,10)
@@ -591,48 +591,48 @@ def drive_along_right(frame):
 def follow_center(deviation):
     if deviation>0:
         
-        drive(15,12)
+        drive(-17,12)
         time.sleep(0.1)
-        drive(15,12)
+        drive(-17,12)
         time.sleep(0.1)
-        drive(15,12)
+        drive(-17,12)
         time.sleep(0.1)
-        drive(10,12)
+        drive(-21,12)
         time.sleep(0.1)
-        drive(2,12)
+        drive(-21,12)
         time.sleep(0.1)
-        drive(-8,12)
+        drive(-21,12)
         time.sleep(0.1)
-        drive(-15,12)
+        drive(-21,12)
         time.sleep(0.1)
-        drive(-8,12)
+        drive(-17,12)
         time.sleep(0.1)
-        drive(-8,12)
+        drive(-17,12)
         time.sleep(0.1)
-        drive(-0,12)
-        print("follow to right")
+        drive(-17,12)
+        print("follow to left")
     elif deviation<0:
         
-        drive(-15,12)
+        drive(0,12)
         time.sleep(0.1)
-        drive(-15,12)
-        time.sleep(0.1)
-        drive(-15,12)
-        time.sleep(0.1)
-        drive(-10,12)
-        time.sleep(0.1)
-        drive(-2,12)
+        drive(4,12)
         time.sleep(0.1)
         drive(8,12)
         time.sleep(0.1)
-        drive(15,12)
+        drive(12,12)
+        time.sleep(0.1)
+        drive(16,12)
+        time.sleep(0.1)
+        drive(12,12)
         time.sleep(0.1)
         drive(8,12)
+        time.sleep(0.1)
+        drive(4,12)
         time.sleep(0.1)
         drive(0,12)
         time.sleep(0.1)
-        drive(8,12)
-        print("follow to left")
+        drive(0,12)
+        print("follow to right")
 
 
 def start():
@@ -642,6 +642,7 @@ def start():
     rospy.init_node('driving')
     motor = rospy.Publisher('xycar_motor', xycar_motor, queue_size=1)
     image_sub = rospy.Subscriber("/usb_cam/image_raw/",Image,img_callback)
+    rate = rospy.Rate(100)
 
     print ("----- Xycar self driving -----")
 
@@ -703,7 +704,7 @@ def start():
             # plt.show()
 
 
-            curveRad, curveDir = measure_lane_curvature(ploty, left_fitx, right_fitx)
+            curveRad, curveDir, leftRad, rightRad= measure_lane_curvature(ploty, left_fitx, right_fitx)
 
 
             # Filling the area of detected lanes with green
@@ -740,14 +741,10 @@ def start():
             #     angle+=1
             
 
-            if abs(deviation)>0.2 and abs(deviation)<1.0 and base_dist>350:
+            if abs(deviation)>0.3 and abs(deviation)<1.0 and base_dist>400:
                 print("fall from center!")
                 follow_center(deviation)
-                for i in range(follow):
-                    follow_center(deviation)
-                follow=0
                 continue
-            follow=0    
             # print("atan value :",math.degrees(math.atan(40/curveRad)))
 
             if no_white(frame,"right"): # drive right : positive angle
@@ -756,40 +753,71 @@ def start():
                 if obstruct_way(frame):
                     if angle<21:angle+=3
                 if angle<12:angle+=3
-                if speed>10:
-                    speed-=2
 
             elif no_white(frame,"left"):  # drive left : negative angle
                 print("no white area on left side")
-                drive_along_right(frame)
-                if angle>0:angle=0
-                if obstruct_way(frame):
-                    if angle>-24:angle-=3
-                if angle>-12:angle-=3
-                if speed>10:
-                    speed-=2
-            
-            else:
-                if base_dist<350:
-                    print("detected area has something wrong!")
-                    search_camera(frame)
-                    continue
+                # drive_along_right(frame)
+
+                x=math.atan(35/rightRad)
+                delta = int(math.degrees(x)) #30 and +0.04 rad
+                if delta>12:delta=12
+
                 if directionDev=="right": # drive left : negative angle
                     if angle>0:angle=0
-                    if angle>=-delta:
-                        angle-=3
-                    else:angle+=3
-                    if delta<=4:angle=0
+                    if delta >= 8:
+                        angle += 3
+                    elif 4 <= delta < 8:
+                        angle -= 3
+                    else: angle = 0
                     
                     
                 elif directionDev=="left": # drive right : positive angle
                     if angle<0:angle=0
-                    if angle<=delta:
-                        angle+=3
-                    else: angle-=3
-                    if delta<=4:angle=0
-                speed=20
+                    if delta <= -8:
+                        angle -= 3
+                    elif -8 <= delta < -4:
+                        angle += 3
+                    else: angle = 0
+
+                if angle>0:angle=0
+                if obstruct_way(frame):
+                    if angle>-24:angle-=3
+                if angle>-12:angle-=3
             
+            else:
+                if base_dist<400:
+                    print("detected area has something wrong!")
+                    search_camera(frame)
+                    continue
+
+                if directionDev=="right": # drive left : negative angle
+                    if angle>0:angle=0
+                    '''if angle>=-delta:
+                        angle-=2
+                    else:angle+=2'''
+                    angle = 0.3*delta
+                    if delta<=4:angle=0
+                    if deviation >= 1:
+                        angle = -19*deviation
+                    
+                    
+                elif directionDev=="left": # drive right : positive angle
+                    if angle<0:angle=0
+                    '''if angle<=delta:
+                        angle+=2
+                    else: angle-=2'''
+                    angle = -0.3*delta
+                    if delta<=4:angle=0
+                    if deviation <= -1:
+                        angle = -19*deviation
+            
+            if abs(angle) >= 6:
+                speed = 16
+            elif abs(angle) >= 4:
+                speed = 17
+            else:
+                speed = 18
+
             print("=====drive info=====")
             print("base_dist :",base_dist)
             print("deviation :",deviation)
@@ -802,6 +830,8 @@ def start():
             # fig1, ax1 = plt.subplots()
             plt.plot(x_list, y_list, 'bo')
             plt.axis([0,1,0,18])
+
+            rate.sleep()
             # plt.pause(0.01)
 
         # except TypeError as t:
