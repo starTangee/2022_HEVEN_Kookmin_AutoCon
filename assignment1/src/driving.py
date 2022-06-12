@@ -27,27 +27,7 @@ xm_per_pix = 3.7 / 720
 # Get path to the current working directory
 CWD_PATH = os.getcwd()
 
-
-
-################################################################################
-######## START - FUNCTIONS TO PERFORM IMAGE PROCESSING #########################
-################################################################################
-
-################################################################################
-#### START - FUNCTION TO READ AN INPUT IMAGE ###################################
-def readVideo():
-
-    # Read input video from current working directory
-    inpImage = cv2.VideoCapture(os.path.join(CWD_PATH, 'drive.mp4'))
-
-    return inpImage
-#### END - FUNCTION TO READ AN INPUT IMAGE #####################################
-################################################################################
-
-
-
-################################################################################
-#### START - FUNCTION TO PROCESS IMAGE #########################################
+# Image process 함수 : image, 차선이 존재하는 가능성을 히스토그램으로 plotting, gray, thresh, blur, canny 
 def processImage(inpImage):
 
     # Apply HLS color filtering to filter out white lane lines
@@ -72,13 +52,8 @@ def processImage(inpImage):
 ##    cv2.imshow("Canny Edges", canny)
 
     return image, hls_result, gray, thresh, blur, canny
-#### END - FUNCTION TO PROCESS IMAGE ###########################################
-################################################################################
 
-
-
-################################################################################
-#### START - FUNCTION TO APPLY PERSPECTIVE WARP ################################
+# frame을 birdView로 전환 
 def perspectiveWarp(inpImage):
 
     # Get image size
@@ -97,20 +72,6 @@ def perspectiveWarp(inpImage):
                       [600, 0],
                       [150, 480],
                       [490, 480]])
-
-
-
-    # src = np.float32([[80, 330],
-    #                   [560, 330],
-    #                   [0, 480],
-    #                   [640, 480]])
-
-    # # Window to be shown
-    # dst = np.float32([[80, 0],
-    #                   [560, 0],
-    #                   [80, 480],
-    #                   [560, 480]])
-
 
     # Matrix to warp the image for birdseye window
     matrix = cv2.getPerspectiveTransform(src, dst)
@@ -131,13 +92,8 @@ def perspectiveWarp(inpImage):
     # cv2.imshow("Birdseye Right", birdseyeRight)
 
     return birdseye, birdseyeLeft, birdseyeRight, minv
-#### END - FUNCTION TO APPLY PERSPECTIVE WARP ##################################
-################################################################################
 
-
-
-################################################################################
-#### START - FUNCTION TO PLOT THE HISTOGRAM OF WARPED IMAGE ####################
+# 히스토그램을 plot해주는 함수
 def plotHistogram(inpImage):
 
     histogram = np.sum(inpImage[inpImage.shape[0] // 2:, :], axis = 0)
@@ -152,14 +108,12 @@ def plotHistogram(inpImage):
     # Return histogram and x-coordinates of left & right lanes to calculate
     # lane width in pixels
     return histogram, leftxBase, rightxBase
-#### END - FUNCTION TO PLOT THE HISTOGRAM OF WARPED IMAGE ######################
-################################################################################
 
-
+# 이전 left_fit, right_fit 정보를 저장
 left_fit_backup=0
 right_fit_backup=0
-################################################################################
-#### START - APPLY SLIDING WINDOW METHOD TO DETECT CURVES ######################
+
+# 곡률을 검출하기 위해서 sliding window 사용
 def slide_window_search(binary_warped, histogram):
 
     # Find the start of left and right lane lines using histogram info
@@ -249,14 +203,12 @@ def slide_window_search(binary_warped, histogram):
     plt.ylim(720, 0)
 
     return ploty, left_fit, right_fit, ltx, rtx
-#### END - APPLY SLIDING WINDOW METHOD TO DETECT CURVES ########################
-################################################################################
 
-
+# general 함수에서 사용할 left_fit, right_fit 값 저장
 left_fit_general=0
 right_fit_general=0
-################################################################################
-#### START - APPLY GENERAL SEARCH METHOD TO DETECT CURVES ######################
+
+# 곡률 검출을 위해 general_search 사용
 def general_search(binary_warped, left_fit, right_fit):
     global left_fit_general, right_fit_general
     nonzero = binary_warped.nonzero()
@@ -331,13 +283,9 @@ def general_search(binary_warped, left_fit, right_fit):
     ret['ploty'] = ploty
 
     return ret
-#### END - APPLY GENERAL SEARCH METHOD TO DETECT CURVES ########################
-################################################################################
 
 
-
-################################################################################
-#### START - FUNCTION TO MEASURE CURVE RADIUS ##################################
+# curvature radius 및 정보 계산
 def measure_lane_curvature(ploty, leftx, rightx):
 
     leftx = leftx[::-1]  # Reverse to match top-to-bottom in y
@@ -365,13 +313,8 @@ def measure_lane_curvature(ploty, leftx, rightx):
         curve_direction = 'Straight'
 
     return (left_curverad + right_curverad) / 2.0, curve_direction
-#### END - FUNCTION TO MEASURE CURVE RADIUS ####################################
-################################################################################
 
-
-
-################################################################################
-#### START - FUNCTION TO VISUALLY SHOW DETECTED LANES AREA #####################
+# 곡률 탐지 결과를 visualization
 def draw_lane_lines(original_image, warped_image, Minv, draw_info):
 
     leftx = draw_info['leftx']
@@ -397,12 +340,8 @@ def draw_lane_lines(original_image, warped_image, Minv, draw_info):
     result = cv2.addWeighted(original_image, 1, newwarp, 0.3, 0)
 
     return pts_mean, result
-#### END - FUNCTION TO VISUALLY SHOW DETECTED LANES AREA #######################
-################################################################################
 
-
-#### START - FUNCTION TO CALCULATE DEVIATION FROM LANE CENTER ##################
-################################################################################
+# 곡률 경로에서 중앙으로부터 떨어진 거리 계산
 def offCenter(meanPts, inpFrame):
 
     # Calculating deviation in meters
@@ -412,13 +351,8 @@ def offCenter(meanPts, inpFrame):
     direction = "left" if deviation < 0 else "right"
 
     return deviation, direction
-################################################################################
-#### END - FUNCTION TO CALCULATE DEVIATION FROM LANE CENTER ####################
 
-
-
-################################################################################
-#### START - FUNCTION TO ADD INFO TEXT TO FINAL IMAGE ##########################
+# 곡률 정보를 frame에 text로 띄우기
 def addText(img, radius, direction, deviation, devDirection):
 
     # Add the radius and center position to the image
@@ -441,13 +375,14 @@ def addText(img, radius, direction, deviation, devDirection):
 
     return img
 
-
+# kill process 함수
 def signal_handler(sig, frame):
     import time
     time.sleep(3)
     os.system('killall -9 python rosout')
     sys.exit(0)
 
+# CVBridge를 이용하여 rostopic 영상정보를 cv2 영상으로 변환 및 받아오기
 signal.signal(signal.SIGINT, signal_handler)
 
 image = np.empty(shape=[0]) 
@@ -457,11 +392,12 @@ motor = None
 CAM_FPS = 30    
 WIDTH, HEIGHT = 640, 480    
 
+# 들어온 이미지를 실시간으로 처리
 def img_callback(data):
     global image
     image = bridge.imgmsg_to_cv2(data, "bgr8")
 
-
+# 조향각과 속도가 주어지면 제어
 def drive(angle_input, speed_input):
 
     global motor
@@ -472,32 +408,10 @@ def drive(angle_input, speed_input):
 
     motor.publish(motor_msg)
 
-def no_white(frame,side):
-    height=480
-    width=640
-    gray_frame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
-    
-    if side=="right": # find the right side roi
-        vertices = np.array([[(width/2+50,height-150),(width-80, height-150), (width, height-80), (width/2+50,height-80)]], dtype=np.int32)
-    elif side=="left": # find the left side roi
-        vertices = np.array([[(width/2-50,height-150),(80, height-150), (0, height-80), (width/2-50,height-80)]], dtype=np.int32)
-    roi_frame=region_of_interest(gray_frame,vertices)
-    white_len = len(roi_frame[roi_frame==255]) # find only white
-    if white_len<300:
-        return True
-    else:
-        False
-
+# birdView에서 좌측 또는 우측에 차선이 존재하는지 검출
 def is_lane(birdView,side):
     height=480
     width=640
-
-
-    # Window to be shown
-    # dst = np.float32([[40, 0],
-    #                   [600, 0],
-    #                   [150, 480],
-    #                   [490, 480]])
 
     '''
     birdView basic line
@@ -523,39 +437,7 @@ def is_lane(birdView,side):
         # print("lane on",side,":",white_len)
         False
 
-def obstruct_way(frame):
-    height=480
-    width=640
-    gray_frame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
-    vertices = np.array([[(80,height-150),(width-80, height-150), (80, height-120), (width-80,height-120)]], dtype=np.int32)
-    
-    roi_frame=region_of_interest(gray_frame,vertices)
-    obstruct_way_len = len(roi_frame[roi_frame==255]) # find only white
-    if obstruct_way_len>800:
-        print("obstructed by way!")
-        print(obstruct_way_len)
-        
-        return True
-    else:
-        False
-
-def is_right_lane(frame):
-    height=480
-    width=640
-    gray_frame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
-    vertices = np.array([[(width-40,height),(width-80, height), (width-80, height-200), (width-40,height-200)]], dtype=np.int32)
-    
-    roi_frame=region_of_interest(gray_frame,vertices)
-    right_lane_len = len(roi_frame[roi_frame==255]) # find only white
-    if right_lane_len>2000:
-        print("right_lane_len exist!")
-        print(right_lane_len)
-        
-        return True
-    else:
-        False
-
-
+# vertices 영역만 roi로 검출한 이미지를 반환
 def region_of_interest(img, vertices, color3=(255,255,255), color1=255): # ROI 셋팅
 
     mask = np.zeros_like(img) # mask = img와 같은 크기의 빈 이미지
@@ -572,16 +454,7 @@ def region_of_interest(img, vertices, color3=(255,255,255), color1=255): # ROI �
     ROI_image = cv2.bitwise_and(img, mask)
     return ROI_image
 
-def search_right_lane():
-    for i in range(10):
-        drive(i*2,10)
-        time.sleep(0.1)
-
-def search_left_lane():
-    for i in range(10):
-        drive(-i*2,12)
-        time.sleep(0.1)
-
+# 차선의 질량중심 추출
 def centerOfMass(frame):
     frame_sum_0 = np.sum(frame,axis=0)
     frame_sum_1 = np.sum(frame,axis=1)
@@ -600,7 +473,7 @@ def centerOfMass(frame):
     centroid_y = int(centroid_y)
     return (centroid_x,centroid_y)
 
-
+# 차선 중앙에 직사각형 영역 설정하고, 그 안에 차선의 질량중심이 들어오면 피하도록 함(차선 회피 함수)
 def lane_avoid(birdView):
     width=640
     height=480
@@ -611,20 +484,14 @@ def lane_avoid(birdView):
     car_center=(width/2,height)
 
     gray_frame = cv2.cvtColor(birdView,cv2.COLOR_BGR2GRAY)
-    # car_location = np.array([[(width/2-160,height-300),(width/2-165,height-240),(width/2-165,height-60),(width/2-160, height),
-    #                         (width/2+160, height),(width/2+165,height-60),(width/2+165,height-240) ,(width/2+160,height-300)]], dtype=np.int32)
-    # car_location = np.array([[(width/2-150,height-270),(width/2-150, height), (width/2+150, height), (width/2+150,height-270)]], dtype=np.int32)
     car_location = np.array([[(width/2-150,height-240),(width/2-150, height), (width/2+150, height), (width/2+150,height-240)]], dtype=np.int32)
     cv2.polylines(avoid_frame, [car_location], True, blue_color)
     roi_frame=region_of_interest(gray_frame,car_location)
     car_avoid_len = len(roi_frame[roi_frame==255]) # find only white
 
     if car_avoid_len>100:
-        # print(car_avoid_len)
-        #calculate lane direction
         white_center = centerOfMass(roi_frame)
         white_direction = (white_center[0]-car_center[0],car_center[1]-white_center[1])
-        # white_direction = (white_center[0]-car_center[0],white_center[1]-car_center[1])
         cv2.line(avoid_frame,white_center,white_center,(255,255,255),5)
         x=white_direction[0]
         y=white_direction[1]
@@ -666,119 +533,28 @@ def lane_avoid(birdView):
 
         rad = math.atan(avoid_direction[0]/avoid_direction[1])
         
-        delta = int(math.degrees(rad)) 
-        # print("=======rad/delta=======")
-        # print("rad",rad)
-        # print("delta",delta)
-        
-        # print("lane_avoid!")
-        
-        # drive(angle,12)
+        delta = int(math.degrees(rad))
         cv2.imshow("avoid_frame",avoid_frame)
         return delta
     else:
         cv2.imshow("avoid_frame",avoid_frame)
         return 0
-    
-        
 
-def search_camera(frame):
-    for i in range(10):
-        if not no_white(frame,"right") and not no_white(frame,"left"):
-            print("search the lane!")
-            drive(i*2,6)    
-            return
-        drive(i*2,3)
-        time.sleep(0.1)
-    for i in range(10):
-        if not no_white(frame,"right") and not no_white(frame,"left"):
-            print("search the lane!")
-            drive(-i*2,6)
-            return
-        drive(-i*2,3)
-        time.sleep(0.1)
-        
-def drive_along_right(frame):
-    print("driving along right lane")
-    while no_white(frame,"right"):
-        drive(-21,10)
-        print("no_white so driving")
-    search_camera
-        
-    
-    # while not no_white(frame, "right") and no_white(frame,"left"):
-    
-        # if is_right_lane(frame):
-        #     drive(0,10)
-        #     return
-        # else:
-        #     angle=0
-        #     if angle>-16:
-        #         angle-=3
-        #     drive(angle,3)
-        
-        #     drive(0,10)
-        #     time.sleep(0.1)
-        
-
-def follow_center(deviation):
-    if deviation>0:
-        
-        drive(15,12)
-        time.sleep(0.1)
-        drive(15,12)
-        time.sleep(0.1)
-        drive(15,12)
-        time.sleep(0.1)
-        drive(10,12)
-        time.sleep(0.1)
-        drive(2,12)
-        time.sleep(0.1)
-        drive(-8,12)
-        time.sleep(0.1)
-        drive(-15,12)
-        time.sleep(0.1)
-        drive(-8,12)
-        time.sleep(0.1)
-        drive(-8,12)
-        time.sleep(0.1)
-        drive(-0,12)
-        print("follow to right")
-    elif deviation<0:
-        
-        drive(-15,12)
-        time.sleep(0.1)
-        drive(-15,12)
-        time.sleep(0.1)
-        drive(-15,12)
-        time.sleep(0.1)
-        drive(-10,12)
-        time.sleep(0.1)
-        drive(-2,12)
-        time.sleep(0.1)
-        drive(8,12)
-        time.sleep(0.1)
-        drive(15,12)
-        time.sleep(0.1)
-        drive(8,12)
-        time.sleep(0.1)
-        drive(0,12)
-        time.sleep(0.1)
-        drive(8,12)
-        print("follow to left")
-
-
+# 메인 함수
 def start():
-
     global motor, image
+
+    # 속도 제어 계수 설정
     speed_avoid=25
     speed_nolane=25
     speed_default=45
 
+    # 조향 제어 계수 설정
     parameter_avoid=0.45
-    parameter_before_angle=0.2 
     parameter_avoid_angle_gain=1
+    no_lane_angle = 0
 
+    # ros node 만들기
     rospy.init_node('driving')
     motor = rospy.Publisher('xycar_motor', xycar_motor, queue_size=1)
     image_sub = rospy.Subscriber("/usb_cam/image_raw/",Image,img_callback)
@@ -788,11 +564,13 @@ def start():
     while not image.size == (WIDTH * HEIGHT * 3):
         continue
 
+    # 전체 조향각 및 속도값 변수 선언
     angle=0
-    speed=15
+    speed=14
+
+    # delta값 plotting하기 위해 최근 5개 delta값 저장할 list
     x_list=deque(maxlen=5)
     y_list=deque(maxlen=5)
-    follow=0
 
     while not rospy.is_shutdown():
         try:
@@ -811,64 +589,57 @@ def start():
 
             frame[thresholds]=[0,0,0]
 
+            # 영상을 버드아이 뷰 변환
             birdView, birdViewL, birdViewR, minverse = perspectiveWarp(frame)
-
-            # Apply image processing by calling the "processImage()" function
-            # Then assign their respective variables (img, hls, grayscale, thresh, blur, canny)
-            # Provide this function with:
-            # 1- an already perspective warped image to process (birdView)
-            # cv2.imshow("birdView",birdView)
             
+            # grayscale 변환, 이미지 블러링, canny edge 검출, 바이너리 이미지 변환
             img, hls, grayscale, thresh, blur, canny = processImage(birdView)
             imgL, hlsL, grayscaleL, threshL, blurL, cannyL = processImage(birdViewL)
             imgR, hlsR, grayscaleR, threshR, blurR, cannyR = processImage(birdViewR)
 
-            # Plot and display the histogram by calling the "get_histogram()" function
-            # Provide this function with:
-            # 1- an image to calculate histogram on (thresh)
             hist, leftBase, rightBase = plotHistogram(thresh)
+            # 곡선 영역 검출 시 버드아이 뷰에서 차선 하단의 폭
             base_dist=rightBase-leftBase
-            
-            # print(rightBase - leftBase)
-            plt.plot(hist)
-            # plt.show()
 
-
+            # 차선을 이차함수로 polyfit
             ploty, left_fit, right_fit, left_fitx, right_fitx = slide_window_search(thresh, hist)
-            plt.plot(left_fit)
-            # plt.show()
 
+            # 차선 검출 후, 이미지 띄우기
             draw_info = general_search(thresh, left_fit, right_fit)
-            # plt.show()
 
+            # 차선의 방향과 curvature 검출
             curveRad, curveDir = measure_lane_curvature(ploty, left_fitx, right_fitx)
 
-            # Filling the area of detected lanes with green
+            # 차선 사이의 곡률 영역 색칠
             meanPts, result = draw_lane_lines(frame, thresh, minverse, draw_info)
 
+            # 중앙으로부터 떨어진 거리와, 차량이 가야하는 방향 도출
             deviation, directionDev = offCenter(meanPts, frame)
 
-
-            # Adding text to our final image
+            # 결과값 텍스트 출력
             finalImg = addText(result, curveRad, curveDir, deviation, directionDev)
 
-            # Displaying final image
+            # 최종 이미지 출력
             cv2.imshow("Final", finalImg)
-
 
             # Wait for the ENTER key to be pressed to stop playback
             if cv2.waitKey(1) == 13:
                 break
 
+            # Ackermann geometry를 통한 delta (기본 조향각) 계산
             x=math.atan(50/curveRad+0.06)
-            delta = int(math.degrees(x)) #30 and +0.04 rad
+            delta = int(math.degrees(x))
+            # delta의 최대 값 제한
             if delta>16:delta=16
             y=delta
+            # delta 값 plot
             x_list.append(x)
             y_list.append(y)
 
+            # 차량 영역에 흰색 선이 침범하면 피하기(차선 회피 알고리즘)
             lane_delta = lane_avoid(birdView)
             lane_angle=int(lane_delta*parameter_avoid)
+            # 차선 회피 조향각 최소, 최댓값 정의. 값이 범위에서 벗어나면 무시
             if abs(lane_angle)<4:lane_angle=0
             if lane_angle!=0:
                 if lane_angle>16 and lane_angle<20:lane_angle=16
@@ -876,9 +647,7 @@ def start():
 
                 if lane_angle<-16 and lane_angle>-20:lane_angle=-16
                 elif lane_angle<=-20:lane_angle=-18
-
-                before_angle=angle
-
+                # 차선 회피 조향각으로 제어
                 if lane_angle>0:
                     if angle<0:
                         angle=0
@@ -889,113 +658,109 @@ def start():
                         angle=0
                     if angle>lane_angle:
                         angle-=parameter_avoid_angle_gain
+                # 차선 회피시 차량 속도 제어
                 if speed>speed_avoid:
                     speed-=3
-                # speed=10
                 
+                # 차선 회피 제어 결과값 출력
                 print("======Avoid the line======")
                 print("angle :",angle)
                 print("speed :",speed)
                 drive(angle,speed)
                 
                 continue
+            # 우측에 차선이 있는지 확인
             elif not is_lane(birdView,"right"):
                 if not is_lane(birdView,"left"):
+                    # 양쪽 차선이 모두 보이지 않으면 일정한 값으로 제어 (No lane)
+                    if angle >= no_lane_angle:
+                        angle -= 2
+                    else:
+                        angle += 2
+
+                    if speed >= 25:
+                        speed -= 3
+                    else:
+                        speed += 3
+                    # No lane 상황의 결과값 출력
                     print("======No lane======")
-                    angle=0
-                    speed=30
                     print("angle :",angle)
                     print("speed :",speed)
                     drive(angle,speed)
                     continue
-
-                # print("no right lane. searching right lane...")
+                # 우측 차선이 겂출되지 않을 시 5도로 제어
                 if angle<0:angle=0
                 if angle<5:
                     angle+=2
-                # speed=10
+                
                 if speed>speed_nolane:
                     speed-=3
+                # 우측 차선이 검출되지 않을 때 결과값 출력
                 print("======no lane in right side======")
-                print("lane_delta :",lane_delta)
                 print("angle :",angle)
                 print("speed :",speed)
                 drive(angle,speed)
                 continue
-                
+
+            # 좌측에 차선이 있는지 확인
             elif not is_lane(birdView,"left"):
-                # print("no left lane. searching left lane...")
+                # 좌측 차선이 검출되지 않을 시 -5도로 제어
                 if angle>0:angle=0
                 if angle>-5:
                     angle-=2
                 if speed>speed_nolane:
                     speed-=3
-                # speed=10
+                # 좌측 차선이 검출되지 않을 때 결과값 출력
                 print("======no lane in left side======")
                 print("angle :",angle)
                 print("speed :",speed)
                 drive(angle,speed)
                 continue
-
-            else: #lane detected well
+            # 예외처리 이외의 일반적인 주행상황
+            else: 
+                # 영역이 충분히 크지 않을 경우 이전 값으로 제어하고, continue
                 if base_dist<300:
                     print("======detecting area is too small======")
                     print("angle :",angle)
                     print("speed :",speed)
                     drive(angle,speed)
                     continue
-
-                if directionDev=="right": # drive left : negative angle
+                # 곡률 검출로부터 우측으로 제어. 앞에서 계산한 delta값 사용
+                if directionDev=="right": 
                     if angle>0:angle=0
                     if angle>=-delta:
                         angle-=3
                     else:angle+=3
                     if delta<=5:angle=0
-                    # if curveDir=="Right Curve" and deviation>0:
-                    #     print("Out-in-out!")
-                    #     # to be deviation<0
-                    #     angle=0
-
-
-                elif directionDev=="left": # drive right : positive angle
+                # 곡률 검출로부터 좌측으로 제어. 앞에서 계산한 delta값 사용
+                elif directionDev=="left": 
                     if angle<0:angle=0
                     if angle<=delta:
                         angle+=3
                     else: angle-=3
                     if delta<=5:angle=0
-                    # if curveDir=="Left Curve" and deviation<0:
-                    #     print("Out-in-out!")
-                    #     # to be deviation>0
-                    #     angle=0
-
-                        
+                
+                # 곡률이 심할 시 미리 속도를 줄여서 회전에 용의하게 함
                 if speed<speed_default:
                     speed+=3
-                # speed=20
-                # print(curveDir)
-                
-
-            
+             
             print("=====common drive=====")
-            # print("base_dist :",base_dist)
-            # print("deviation :",deviation)
-            # print("delta :",delta)
             print("angle :",angle)
             print("speed :",speed)
 
             drive(angle, speed)
-            # drive(angle, speed)
-            # drive(angle, speed)
-            # plt.cla()
-            # fig1, ax1 = plt.subplots()
+
+            # delta 값 plotting
+            '''
+            plt.cla()
             plt.plot(x_list, y_list, 'bo')
             plt.axis([0,1,0,18])
-            # plt.pause(0.01)
-
+            plt.pause(0.01)
+            '''
+            
+        # 예외가 발생할 경우 이전 제어값으로 제어
         except Exception as e:
             print(traceback.format_exc())
-            # print("error occured!")
-            # print(e)
             drive(angle, speed)
             continue
 
