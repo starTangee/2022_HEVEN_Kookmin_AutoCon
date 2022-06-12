@@ -547,7 +547,8 @@ def start():
     # 속도 제어 계수 설정
     speed_avoid=25
     speed_nolane=25
-    speed_default=45
+    speed_default=47
+    speed_turn = 25
 
     # 조향 제어 계수 설정
     parameter_avoid=0.45
@@ -741,6 +742,11 @@ def start():
                     if delta<=5:angle=0
                 
                 # 곡률이 심할 시 미리 속도를 줄여서 회전에 용의하게 함
+                if delta>5:
+                    if speed>speed_turn:
+                        speed-=3
+
+                # 기본 속도로 제어
                 if speed<speed_default:
                     speed+=3
              
