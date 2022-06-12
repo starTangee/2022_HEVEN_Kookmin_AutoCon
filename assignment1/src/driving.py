@@ -545,14 +545,15 @@ def start():
     global motor, image
 
     # 속도 제어 계수 설정
-    speed_avoid=25
+    speed_avoid=30 
     speed_nolane=25
-    speed_default=45
+    speed_default=47
+    speed_turn = 25
 
     # 조향 제어 계수 설정
     parameter_avoid=0.45
     parameter_avoid_angle_gain=1
-    no_lane_angle = 0
+    no_lane_angle = -5
 
     # ros node 만들기
     rospy.init_node('driving')
@@ -674,9 +675,9 @@ def start():
                 if not is_lane(birdView,"left"):
                     # 양쪽 차선이 모두 보이지 않으면 일정한 값으로 제어 (No lane)
                     if angle >= no_lane_angle:
-                        angle -= 2
+                        angle -= 3
                     else:
-                        angle += 2
+                        angle += 3
 
                     if speed >= 25:
                         speed -= 3
@@ -705,9 +706,9 @@ def start():
             # 좌측에 차선이 있는지 확인
             elif not is_lane(birdView,"left"):
                 # 좌측 차선이 검출되지 않을 시 -5도로 제어
-                if angle>0:angle=0
-                if angle>-5:
-                    angle-=2
+                # if angle>0:angle=0
+                if angle<0:
+                    angle+=2
                 if speed>speed_nolane:
                     speed-=3
                 # 좌측 차선이 검출되지 않을 때 결과값 출력
@@ -741,8 +742,13 @@ def start():
                     if delta<=5:angle=0
                 
                 # 곡률이 심할 시 미리 속도를 줄여서 회전에 용의하게 함
-                if speed<speed_default:
-                    speed+=3
+                if delta>5:
+                    if speed>speed_turn:
+                        speed-=3
+                # 기본 속도로 제어
+                else:
+                    if speed<speed_default:
+                        speed+=3
              
             print("=====common drive=====")
             print("angle :",angle)
