@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from collections import deque
+from operator import truediv
 import numpy as np
 import cv2, math
 import rospy, rospkg, time
@@ -85,45 +87,30 @@ def perspectiveWarp(inpImage):
     height=img_size[1]
     width=img_size[0]
 
-
-    src = np.float32([[80, 330],
-                      [560, 330],
-                      [0, 480],
-                      [640, 480]])
+    src = np.float32([[90, 330],
+                      [550, 330],
+                      [0, 460],
+                      [640, 460]])
 
     # Window to be shown
-    dst = np.float32([[80, 0],
-                      [560, 0],
-                      [80, 480],
-                      [560, 480]])
-    
+    dst = np.float32([[40, 0],
+                      [600, 0],
+                      [150, 480],
+                      [490, 480]])
 
 
 
-    # src = np.float32([[590, 440],
-    #                   [690, 440],
-    #                   [200, 640],
-    #                   [1000, 640]])/2
+    # src = np.float32([[80, 330],
+    #                   [560, 330],
+    #                   [0, 480],
+    #                   [640, 480]])
 
     # # Window to be shown
-    # dst = np.float32([[200, 0],
-    #                   [1200, 0],
-    #                   [200, 710],
-    #                   [1200, 710]])/2
-    
-    
-    
-    
-    # src = np.float32([[295, 290],
-    #                   [345, 290],
-    #                   [100, 426],
-    #                   [500, 426]])
-    # print(src)
-    # # Window to be shown
-    # dst = np.float32([[100, 0],
-    #                   [600, 0],
-    #                   [100, 470],
-    #                   [600, 470]])
+    # dst = np.float32([[80, 0],
+    #                   [560, 0],
+    #                   [80, 480],
+    #                   [560, 480]])
+
 
     # Matrix to warp the image for birdseye window
     matrix = cv2.getPerspectiveTransform(src, dst)
@@ -351,7 +338,7 @@ def general_search(binary_warped, left_fit, right_fit):
 
 ################################################################################
 #### START - FUNCTION TO MEASURE CURVE RADIUS ##################################
-def measure_lane_curvature(ploty, leftx, rightx, detect_cond=0):
+def measure_lane_curvature(ploty, leftx, rightx):
 
     leftx = leftx[::-1]  # Reverse to match top-to-bottom in y
     rightx = rightx[::-1]  # Reverse to match top-to-bottom in y
@@ -377,7 +364,7 @@ def measure_lane_curvature(ploty, leftx, rightx, detect_cond=0):
     else:
         curve_direction = 'Straight'
 
-    return (left_curverad + right_curverad) / 2.0, curve_direction, left_curverad, right_curverad
+    return (left_curverad + right_curverad) / 2.0, curve_direction
 #### END - FUNCTION TO MEASURE CURVE RADIUS ####################################
 ################################################################################
 
@@ -478,7 +465,7 @@ def img_callback(data):
 def drive(angle_input, speed_input):
 
     global motor
-    global angle, speed
+    # global angle, speed
     motor_msg = xycar_motor()
     motor_msg.angle = angle_input
     motor_msg.speed = speed_input
@@ -489,6 +476,7 @@ def no_white(frame,side):
     height=480
     width=640
     gray_frame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+    
     if side=="right": # find the right side roi
         vertices = np.array([[(width/2+50,height-150),(width-80, height-150), (width, height-80), (width/2+50,height-80)]], dtype=np.int32)
     elif side=="left": # find the left side roi
@@ -498,6 +486,41 @@ def no_white(frame,side):
     if white_len<300:
         return True
     else:
+        False
+
+def is_lane(birdView,side):
+    height=480
+    width=640
+
+
+    # Window to be shown
+    # dst = np.float32([[40, 0],
+    #                   [600, 0],
+    #                   [150, 480],
+    #                   [490, 480]])
+
+    '''
+    birdView basic line
+    (40,0)--------------------(600,0)
+    |...............................|
+    |...............................|
+    |...............................|
+    |...............................|
+    (40.480)----------------(600,480)
+    '''
+
+    gray_frame = cv2.cvtColor(birdView,cv2.COLOR_BGR2GRAY)
+    if side=="left": # find the right side roi
+        vertices = np.array([[(40,height/2),(40,height), (width/2,height), (width/2,height/2)]], dtype=np.int32)
+    elif side=="right": # find the left side roi
+        vertices = np.array([[(width/2,height/2),(width/2,height), (width-40,height), (width-40,height/2)]], dtype=np.int32)
+    roi_frame=region_of_interest(gray_frame,vertices)
+    white_len = len(roi_frame[roi_frame==255]) # find only white
+    
+    if white_len>1000:
+        return True
+    else:
+        # print("lane on",side,":",white_len)
         False
 
 def obstruct_way(frame):
@@ -549,20 +572,130 @@ def region_of_interest(img, vertices, color3=(255,255,255), color1=255): # ROI ì
     ROI_image = cv2.bitwise_and(img, mask)
     return ROI_image
 
-def search_camera(frame):
-    for i in range(5):
-        '''if not no_white(frame,"right"):
-            print("search the lane!, right")
-            drive(i*2,6)    
-            return'''
-        drive(-i*2,6)
+def search_right_lane():
+    for i in range(10):
+        drive(i*2,10)
         time.sleep(0.1)
-    for i in range(5):
-        '''if not no_white(frame,"left"):
-            print("search the lane!, left")
+
+def search_left_lane():
+    for i in range(10):
+        drive(-i*2,12)
+        time.sleep(0.1)
+
+def centerOfMass(frame):
+    frame_sum_0 = np.sum(frame,axis=0)
+    frame_sum_1 = np.sum(frame,axis=1)
+    
+    centroid_x = 0
+    for i, s in enumerate(frame_sum_0):
+        centroid_x += i*s
+    centroid_x /= frame_sum_0.sum()
+
+    centroid_y = 0
+    for i, s in enumerate(frame_sum_1):
+        centroid_y += i*s
+    centroid_y /= frame_sum_1.sum()
+    
+    centroid_x = int(centroid_x)
+    centroid_y = int(centroid_y)
+    return (centroid_x,centroid_y)
+
+
+def lane_avoid(birdView):
+    width=640
+    height=480
+    blue_color = (255,0,0)
+    red_color=(0,0,255)
+    avoid_frame=np.zeros((height,width,3),np.uint8)
+
+    car_center=(width/2,height)
+
+    gray_frame = cv2.cvtColor(birdView,cv2.COLOR_BGR2GRAY)
+    # car_location = np.array([[(width/2-160,height-300),(width/2-165,height-240),(width/2-165,height-60),(width/2-160, height),
+    #                         (width/2+160, height),(width/2+165,height-60),(width/2+165,height-240) ,(width/2+160,height-300)]], dtype=np.int32)
+    # car_location = np.array([[(width/2-150,height-270),(width/2-150, height), (width/2+150, height), (width/2+150,height-270)]], dtype=np.int32)
+    car_location = np.array([[(width/2-150,height-240),(width/2-150, height), (width/2+150, height), (width/2+150,height-240)]], dtype=np.int32)
+    cv2.polylines(avoid_frame, [car_location], True, blue_color)
+    roi_frame=region_of_interest(gray_frame,car_location)
+    car_avoid_len = len(roi_frame[roi_frame==255]) # find only white
+
+    if car_avoid_len>100:
+        # print(car_avoid_len)
+        #calculate lane direction
+        white_center = centerOfMass(roi_frame)
+        white_direction = (white_center[0]-car_center[0],car_center[1]-white_center[1])
+        # white_direction = (white_center[0]-car_center[0],white_center[1]-car_center[1])
+        cv2.line(avoid_frame,white_center,white_center,(255,255,255),5)
+        x=white_direction[0]
+        y=white_direction[1]
+        avoid_direction=(1,10)
+        if x>0 and y>0:
+            avoid_direction = (-y,x)
+            car_location_sub = np.array([[(width/2-180,height-240),(width/2-180, height), (width/2-100, height), (width/2-100,height-240)]], dtype=np.int32)
+            roi_frame_sub=region_of_interest(gray_frame,car_location_sub)
+            car_avoid_len_sub = len(roi_frame_sub[roi_frame_sub==255])
+            if car_avoid_len_sub>100:
+                white_center_sub = centerOfMass(roi_frame_sub)
+                white_direction_sub = (white_center_sub[0]-car_center[0],car_center[1]-white_center_sub[1])
+                x_sub=white_direction_sub[0]
+                y_sub=white_direction_sub[1]
+                avoid_direction = (y_sub,-x_sub)
+                cv2.line(avoid_frame,white_center_sub,white_center_sub,(0,255,0),5)
+                cv2.polylines(avoid_frame, [car_location_sub], True, (0,255,0))
+        elif x<0 and y>0:
+            avoid_direction = (y,-x)
+            car_location_sub = np.array([[(width/2+100,height-240),(width/2+100, height), (width/2+170, height), (width/2+170,height-240)]], dtype=np.int32)
+            roi_frame_sub=region_of_interest(gray_frame,car_location_sub)
+            car_avoid_len_sub = len(roi_frame_sub[roi_frame_sub==255])
+            if car_avoid_len_sub>100:
+                white_center_sub = centerOfMass(roi_frame_sub)
+                white_direction_sub = (white_center_sub[0]-car_center[0],car_center[1]-white_center_sub[1])
+                x_sub=white_direction_sub[0]
+                y_sub=white_direction_sub[1]
+                avoid_direction = (-y_sub,x_sub)
+                cv2.line(avoid_frame,white_center_sub,white_center_sub,(0,255,0),5)
+                cv2.polylines(avoid_frame, [car_location_sub], True, (0,255,0))
+
+        else:
+            print("white point has invalid boundary.")
+            print("white_direction",white_direction)
+            print("avoid_direction",avoid_direction)
+        
+        
+        avoid_frame=cv2.line(avoid_frame,car_center,(car_center[0]+avoid_direction[0],car_center[1]-avoid_direction[1]),red_color,5)
+
+        rad = math.atan(avoid_direction[0]/avoid_direction[1])
+        
+        delta = int(math.degrees(rad)) 
+        # print("=======rad/delta=======")
+        # print("rad",rad)
+        # print("delta",delta)
+        
+        # print("lane_avoid!")
+        
+        # drive(angle,12)
+        cv2.imshow("avoid_frame",avoid_frame)
+        return delta
+    else:
+        cv2.imshow("avoid_frame",avoid_frame)
+        return 0
+    
+        
+
+def search_camera(frame):
+    for i in range(10):
+        if not no_white(frame,"right") and not no_white(frame,"left"):
+            print("search the lane!")
+            drive(i*2,6)    
+            return
+        drive(i*2,3)
+        time.sleep(0.1)
+    for i in range(10):
+        if not no_white(frame,"right") and not no_white(frame,"left"):
+            print("search the lane!")
             drive(-i*2,6)
-            return'''
-        drive(i*2,6)
+            return
+        drive(-i*2,3)
         time.sleep(0.1)
         
 def drive_along_right(frame):
@@ -570,10 +703,10 @@ def drive_along_right(frame):
     while no_white(frame,"right"):
         drive(-21,10)
         print("no_white so driving")
-    search_camera(frame)
+    search_camera
         
     
-    # while not no_white(frame, "right") and no _white(frame,"left"):
+    # while not no_white(frame, "right") and no_white(frame,"left"):
     
         # if is_right_lane(frame):
         #     drive(0,10)
@@ -591,58 +724,64 @@ def drive_along_right(frame):
 def follow_center(deviation):
     if deviation>0:
         
-        drive(-17,12)
+        drive(15,12)
         time.sleep(0.1)
-        drive(-17,12)
+        drive(15,12)
         time.sleep(0.1)
-        drive(-17,12)
+        drive(15,12)
         time.sleep(0.1)
-        drive(-21,12)
+        drive(10,12)
         time.sleep(0.1)
-        drive(-21,12)
+        drive(2,12)
         time.sleep(0.1)
-        drive(-21,12)
+        drive(-8,12)
         time.sleep(0.1)
-        drive(-21,12)
+        drive(-15,12)
         time.sleep(0.1)
-        drive(-17,12)
+        drive(-8,12)
         time.sleep(0.1)
-        drive(-17,12)
+        drive(-8,12)
         time.sleep(0.1)
-        drive(-17,12)
-        print("follow to left")
+        drive(-0,12)
+        print("follow to right")
     elif deviation<0:
         
-        drive(0,12)
+        drive(-15,12)
         time.sleep(0.1)
-        drive(4,12)
+        drive(-15,12)
         time.sleep(0.1)
-        drive(8,12)
+        drive(-15,12)
         time.sleep(0.1)
-        drive(12,12)
+        drive(-10,12)
         time.sleep(0.1)
-        drive(16,12)
-        time.sleep(0.1)
-        drive(12,12)
+        drive(-2,12)
         time.sleep(0.1)
         drive(8,12)
         time.sleep(0.1)
-        drive(4,12)
+        drive(15,12)
+        time.sleep(0.1)
+        drive(8,12)
         time.sleep(0.1)
         drive(0,12)
         time.sleep(0.1)
-        drive(0,12)
-        print("follow to right")
+        drive(8,12)
+        print("follow to left")
 
 
 def start():
 
     global motor, image
+    speed_avoid=25
+    speed_nolane=25
+    speed_default=45
+
+    parameter_avoid=0.45
+    parameter_before_angle=0.2 
+    parameter_avoid_angle_gain=1
 
     rospy.init_node('driving')
     motor = rospy.Publisher('xycar_motor', xycar_motor, queue_size=1)
     image_sub = rospy.Subscriber("/usb_cam/image_raw/",Image,img_callback)
-    rate = rospy.Rate(100)
 
     print ("----- Xycar self driving -----")
 
@@ -651,8 +790,8 @@ def start():
 
     angle=0
     speed=15
-    x_list=[]
-    y_list=[]
+    x_list=deque(maxlen=5)
+    y_list=deque(maxlen=5)
     follow=0
 
     while not rospy.is_shutdown():
@@ -678,11 +817,11 @@ def start():
             # Then assign their respective variables (img, hls, grayscale, thresh, blur, canny)
             # Provide this function with:
             # 1- an already perspective warped image to process (birdView)
+            # cv2.imshow("birdView",birdView)
             
             img, hls, grayscale, thresh, blur, canny = processImage(birdView)
             imgL, hlsL, grayscaleL, threshL, blurL, cannyL = processImage(birdViewL)
             imgR, hlsR, grayscaleR, threshR, blurR, cannyR = processImage(birdViewR)
-
 
             # Plot and display the histogram by calling the "get_histogram()" function
             # Provide this function with:
@@ -699,13 +838,10 @@ def start():
             plt.plot(left_fit)
             # plt.show()
 
-
             draw_info = general_search(thresh, left_fit, right_fit)
             # plt.show()
 
-
-            curveRad, curveDir, leftRad, rightRad= measure_lane_curvature(ploty, left_fitx, right_fitx)
-
+            curveRad, curveDir = measure_lane_curvature(ploty, left_fitx, right_fitx)
 
             # Filling the area of detected lanes with green
             meanPts, result = draw_lane_lines(frame, thresh, minverse, draw_info)
@@ -724,141 +860,138 @@ def start():
             if cv2.waitKey(1) == 13:
                 break
 
-            # cv2.imshow("CAM View", img)
-            # cv2.waitKey(1)
-            x=math.atan(35/curveRad)
+            x=math.atan(50/curveRad+0.06)
             delta = int(math.degrees(x)) #30 and +0.04 rad
-            if delta>12:delta=12
+            if delta>16:delta=16
             y=delta
             x_list.append(x)
             y_list.append(y)
-            
-            
-            # if delta>10:delta=15
-            # elif delta>6:delta=10
-            # if delta>16:delta=16
-            # if angle<delta:
-            #     angle+=1
-            
 
-            if abs(deviation)>0.3 and abs(deviation)<1.0 and base_dist>400:
-                print("fall from center!")
-                follow_center(deviation)
+            lane_delta = lane_avoid(birdView)
+            lane_angle=int(lane_delta*parameter_avoid)
+            if abs(lane_angle)<4:lane_angle=0
+            if lane_angle!=0:
+                if lane_angle>16 and lane_angle<20:lane_angle=16
+                elif lane_angle>=20:lane_angle=18
+
+                if lane_angle<-16 and lane_angle>-20:lane_angle=-16
+                elif lane_angle<=-20:lane_angle=-18
+
+                before_angle=angle
+
+                if lane_angle>0:
+                    if angle<0:
+                        angle=0
+                    if angle<lane_angle:
+                        angle+=parameter_avoid_angle_gain
+                elif lane_angle<0:
+                    if angle>0:
+                        angle=0
+                    if angle>lane_angle:
+                        angle-=parameter_avoid_angle_gain
+                if speed>speed_avoid:
+                    speed-=3
+                # speed=10
+                
+                print("======Avoid the line======")
+                print("angle :",angle)
+                print("speed :",speed)
+                drive(angle,speed)
+                
                 continue
-            # print("atan value :",math.degrees(math.atan(40/curveRad)))
+            elif not is_lane(birdView,"right"):
+                if not is_lane(birdView,"left"):
+                    print("======No lane======")
+                    angle=0
+                    speed=30
+                    print("angle :",angle)
+                    print("speed :",speed)
+                    drive(angle,speed)
+                    continue
 
-            if no_white(frame,"right"): # drive right : positive angle
-                print("no white area on right side")
+                # print("no right lane. searching right lane...")
                 if angle<0:angle=0
-                if obstruct_way(frame):
-                    if angle<21:angle+=3
-                if angle<12:angle+=3
-
-            elif no_white(frame,"left"):  # drive left : negative angle
-                print("no white area on left side")
-                # drive_along_right(frame)
-
-                x=math.atan(35/rightRad)
-                delta = int(math.degrees(x)) #30 and +0.04 rad
-                if delta>12:delta=12
-
-                if directionDev=="right": # drive left : negative angle
-                    if angle>0:angle=0
-                    if delta >= 8:
-                        angle += 3
-                    elif 4 <= delta < 8:
-                        angle -= 3
-                    else: angle = 0
-                    
-                    
-                elif directionDev=="left": # drive right : positive angle
-                    if angle<0:angle=0
-                    if delta <= -8:
-                        angle -= 3
-                    elif -8 <= delta < -4:
-                        angle += 3
-                    else: angle = 0
-
+                if angle<5:
+                    angle+=2
+                # speed=10
+                if speed>speed_nolane:
+                    speed-=3
+                print("======no lane in right side======")
+                print("lane_delta :",lane_delta)
+                print("angle :",angle)
+                print("speed :",speed)
+                drive(angle,speed)
+                continue
+                
+            elif not is_lane(birdView,"left"):
+                # print("no left lane. searching left lane...")
                 if angle>0:angle=0
-                if obstruct_way(frame):
-                    if angle>-24:angle-=3
-                if angle>-12:angle-=3
-            
-            else:
-                if base_dist<400:
-                    print("detected area has something wrong!")
-                    search_camera(frame)
+                if angle>-5:
+                    angle-=2
+                if speed>speed_nolane:
+                    speed-=3
+                # speed=10
+                print("======no lane in left side======")
+                print("angle :",angle)
+                print("speed :",speed)
+                drive(angle,speed)
+                continue
+
+            else: #lane detected well
+                if base_dist<300:
+                    print("======detecting area is too small======")
+                    print("angle :",angle)
+                    print("speed :",speed)
+                    drive(angle,speed)
                     continue
 
                 if directionDev=="right": # drive left : negative angle
                     if angle>0:angle=0
-                    '''if angle>=-delta:
-                        angle-=2
-                    else:angle+=2'''
-                    angle = 0.3*delta
-                    if delta<=4:angle=0
-                    if deviation >= 1:
-                        angle = -19*deviation
-                    
-                    
+                    if angle>=-delta:
+                        angle-=3
+                    else:angle+=3
+                    if delta<=5:angle=0
+                    # if curveDir=="Right Curve" and deviation>0:
+                    #     print("Out-in-out!")
+                    #     # to be deviation<0
+                    #     angle=0
+
+
                 elif directionDev=="left": # drive right : positive angle
                     if angle<0:angle=0
-                    '''if angle<=delta:
-                        angle+=2
-                    else: angle-=2'''
-                    angle = -0.3*delta
-                    if delta<=4:angle=0
-                    if deviation <= -1:
-                        angle = -19*deviation
-            
-            if abs(angle) >= 6:
-                speed = 16
-            elif abs(angle) >= 4:
-                speed = 17
-            else:
-                speed = 18
+                    if angle<=delta:
+                        angle+=3
+                    else: angle-=3
+                    if delta<=5:angle=0
+                    # if curveDir=="Left Curve" and deviation<0:
+                    #     print("Out-in-out!")
+                    #     # to be deviation>0
+                    #     angle=0
 
-            print("=====drive info=====")
-            print("base_dist :",base_dist)
-            print("deviation :",deviation)
-            print("delta :",delta)
+                        
+                if speed<speed_default:
+                    speed+=3
+                # speed=20
+                # print(curveDir)
+                
+
+            
+            print("=====common drive=====")
+            # print("base_dist :",base_dist)
+            # print("deviation :",deviation)
+            # print("delta :",delta)
             print("angle :",angle)
             print("speed :",speed)
 
             drive(angle, speed)
+            # drive(angle, speed)
+            # drive(angle, speed)
             # plt.cla()
             # fig1, ax1 = plt.subplots()
             plt.plot(x_list, y_list, 'bo')
             plt.axis([0,1,0,18])
-
-            rate.sleep()
             # plt.pause(0.01)
 
-        # except TypeError as t:
-        #     if base_dist>350:
-        #         continue
-        #     if obstruct_way(frame):
-        #         print("lane in right")
-        #         drive(-30,8)
-        #     search_camera(frame)
-        #     continue
-        #     # follow=3
-        #     # for i in range(10):
-        #     #     drive(-30,8)    
-        #     #     time.sleep(0.1)
-        #     # for i in range(50):
-        #     #     drive(0,8)    
-        #     #     time.sleep(0.1)
-        #     # continue
-        #     # drive_along_right(frame)
-        #     # if no_white(frame, "left"):
-        #     #     for i in range(15):
-        #     #         drive(-15,20)
-        #     #         time.sleep(0.1)
-        #     # elif no_white(frame, "right"):
-        #     #     for i in range(15):
-        #     #         drive(15,20)
-        #     #         time.sleep(0.1)
         except Exception as e:
             print(traceback.format_exc())
             # print("error occured!")
