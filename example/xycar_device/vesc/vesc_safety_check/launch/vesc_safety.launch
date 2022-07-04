@@ -1,0 +1,5 @@
+<launch>
+    <include file="$(find ydlidar_ros)/launch/lidar.launch" />
+
+    <node name="vesc_safety_check" pkg="vesc_safety_check" type="ydlidar_safety_node" output="screen"/>
+</launch>

@@ -1,0 +1,19 @@
+<!-- -*- mode: XML -*- -->
+<launch>
+  <rosparam file="$(find vesc_driver)/yaml/vesc.yaml" command="load" />
+
+  <node pkg="vesc_ackermann" type="ackermann_to_vesc_node" name="ackermann_to_vesc">
+      <remap from="ackermann_cmd" to="/ackermann_cmd" />
+  </node>
+
+  <node pkg="vesc_driver" type="vesc_driver_node" name="vesc_driver" output="screen"/>
+<!--
+  <node name="rplidarNode"          pkg="rplidar_ros"  type="rplidarNode" output="screen">
+      <param name="serial_port"         type="string" value="/dev/ttyUSB0"/>
+      <param name="serial_baudrate"     type="int"    value="115200"/>
+      <param name="frame_id"            type="string" value="laser"/>
+      <param name="inverted"            type="bool"   value="false"/>
+      <param name="angle_compensate"    type="bool"   value="true"/>
+  </node>
+-->
+</launch>

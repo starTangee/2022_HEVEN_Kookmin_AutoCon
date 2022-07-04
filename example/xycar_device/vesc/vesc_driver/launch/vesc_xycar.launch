@@ -1,0 +1,52 @@
+<!-- -->
+<launch>
+
+  <group ns="vesc">
+    <node name="mux_chainer" pkg="topic_tools" type="relay" args="/vesc/high_level/ackermann_cmd_mux/output /vesc/low_level/ackermann_cmd_mux/input/navigation" />
+    <node name="mux_topic_backward_compat_safety" pkg="topic_tools" type="relay" args="/vesc/ackermann_cmd_mux/input/safety /vesc/low_level/ackermann_cmd_mux/input/safety" />
+    <node name="mux_topic_backward_compat_teleop" pkg="topic_tools" type="relay" args="/vesc/ackermann_cmd_mux/input/teleop /vesc/low_level/ackermann_cmd_mux/input/teleop" />
+    <node name="mux_topic_backward_compat_navigation" pkg="topic_tools" type="relay" args="/vesc/ackermann_cmd_mux/input/navigation /vesc/high_level/ackermann_cmd_mux/input/nav_0" />
+    <node name="zero_ackermann_cmd" pkg="rostopic" type="rostopic" args="pub -r 6 high_level/ackermann_cmd_mux/input/default ackermann_msgs/AckermannDriveStamped '{header: auto, drive: {steering_angle: 0.0, speed: 0.0} }'" />
+  
+    <node pkg="nodelet" type="nodelet" name="ackermann_cmd_mux_nodelet_manager" args="manager" ns="high_level"/>
+    <node pkg="nodelet" type="nodelet" name="ackermann_cmd_mux" args="load ackermann_cmd_mux/AckermannCmdMuxNodelet ackermann_cmd_mux_nodelet_manager" ns="high_level">
+      <param name="yaml_cfg_file" value="$(find vesc_driver)/yaml/high_level_mux.yaml"/>
+    </node>
+
+    <node pkg="nodelet" type="nodelet" name="ackermann_cmd_mux_nodelet_manager" args="manager" ns="low_level"/>
+    <node pkg="nodelet" type="nodelet" name="ackermann_cmd_mux" args="load ackermann_cmd_mux/AckermannCmdMuxNodelet ackermann_cmd_mux_nodelet_manager" ns="low_level">
+      <param name="yaml_cfg_file" value="$(find vesc_driver)/yaml/low_level_mux.yaml"/>
+    </node>
+
+    <rosparam file="$(find vesc_driver)/yaml/vesc.yaml" command="load" />
+
+    <node pkg="vesc_ackermann" type="ackermann_to_vesc_node" name="ackermann_to_vesc">
+      <remap from="ackermann_cmd" to="/safety_ackermann_cmd" />
+      <remap from="commands/motor/speed" to="commands/motor/unsmoothed_speed" />
+      <remap from="commands/servo/position" to="commands/servo/unsmoothed_position" />
+    </node>
+
+    <node pkg="vesc_driver" type="vesc_driver_node" name="vesc_driver" />
+    <node pkg="vesc_ackermann" type="vesc_to_odom_node" name="vesc_to_odom" />
+
+    <node name="throttle_interpolator" pkg="ackermann_cmd_mux" type="throttle_interpolator.py" />
+  </group>
+
+  <node name="ydlidar_node"  pkg="ydlidar_ros"  type="ydlidar_node" output="screen" respawn="false" >
+    <param name="port"         type="string" value="/dev/ydlidar"/>  
+    <param name="baudrate"         type="int" value="230400"/>  
+    <param name="frame_id"     type="string" value="laser_frame"/>
+    <param name="resolution_fixed"    type="bool"   value="true"/>
+    <param name="auto_reconnect"    type="bool"   value="true"/>
+    <param name="reversion"    type="bool"   value="true"/>
+    <param name="angle_min"    type="double" value="-180" />
+    <param name="angle_max"    type="double" value="180" />
+    <param name="range_min"    type="double" value="0.1" />
+    <param name="range_max"    type="double" value="16.0" />
+    <param name="ignore_array" type="string" value="" />
+    <param name="frequency"    type="double" value="25"/>
+  </node>
+
+  <node name="vesc_safety_check" pkg="vesc_safety_check" type="ydlidar_safety_node" output="screen"/>
+
+</launch>

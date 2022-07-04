@@ -1,0 +1,5 @@
+<launch>
+  <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
+  <include file="$(find usb_cam)/launch/xycar_cam.launch" />
+  <node name="hough_drive" pkg="hough_drive" type="hough_drive.py" output="screen" />
+</launch>

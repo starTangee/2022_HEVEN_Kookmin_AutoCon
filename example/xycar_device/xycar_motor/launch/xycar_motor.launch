@@ -1,0 +1,12 @@
+<launch>
+  <arg name="motor_type" default="$(env motor_version)" />
+  <arg name="angle_offset" default="0" />
+  <group unless="$(arg motor_type)">
+    <include file="$(find vesc_driver)/launch/vesc_drive_xycar_motor.launch" />
+  </group>
+  <node name="xycar_motor" pkg="xycar_motor" type="xycar_motor.py" output="screen" >
+    <param name="motor_type" value="$(arg motor_type)" />
+    <param name="angle_offset" value="$(arg angle_offset)" />
+  </node>
+
+</launch>

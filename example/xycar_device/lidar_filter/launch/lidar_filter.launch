@@ -1,0 +1,25 @@
+<launch>
+    <node name="xycar_lidar"  pkg="xycar_lidar"  type="xycar_ydlidar" output="screen" respawn="false" >
+        <param name="port"         type="string" value="/dev/ttyLIDAR"/>  
+        <param name="baudrate"         type="int" value="230400"/>  
+        <param name="frame_id"     type="string" value="map"/>
+        <param name="resolution_fixed"    type="bool"   value="true"/>
+        <param name="auto_reconnect"    type="bool"   value="true"/>
+        <param name="reversion"    type="bool"   value="false"/>
+        <param name="angle_min"    type="double" value="-180" />
+        <param name="angle_max"    type="double" value="180" />
+        <param name="range_min"    type="double" value="0.1" />
+        <param name="range_max"    type="double" value="16.0" />
+        <param name="ignore_array" type="string" value="" />
+        <param name="frequency"    type="double" value="10"/>
+        <param name="samp_rate"    type="int"    value="5"/>
+    </node>
+    <node name="lidar_filter" pkg="lidar_filter" type="lidar_filter.py" output="screen" >
+        <param name="receive_topic"  value="scan"/>
+        <param name="output_topic"   value="new_scan"/>
+        <param name="rotate"         value="90.0"/>
+        <param name="ranges_count"   value="360"/>
+        <param name="hz"             value="15"/>
+        <param name="frame_id"       value="map"/>
+    </node> 
+</launch>
