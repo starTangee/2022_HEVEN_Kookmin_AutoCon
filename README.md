@@ -39,5 +39,5 @@ TBC
 
 ## 6. 센서별 rosbag 파일
 
-카메라 : [다운로드](https://drive.google.com/file/d/19e_oFJ1TOnnhaJg_sLq5L76Wk2-rTS7m/view?usp=sharing)
-그 외 센서 : ``bagfiles`` 디렉터리 참고
+카메라 : [다운로드](https://drive.google.com/file/d/19e_oFJ1TOnnhaJg_sLq5L76Wk2-rTS7m/view?usp=sharing)<br>
+LiDAR, IMU, 초음파 센서 : ``bagfiles`` 디렉터리 참고
