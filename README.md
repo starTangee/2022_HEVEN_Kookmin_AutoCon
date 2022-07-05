@@ -41,3 +41,29 @@ TBC
 
 카메라 : [다운로드](https://drive.google.com/file/d/19e_oFJ1TOnnhaJg_sLq5L76Wk2-rTS7m/view?usp=sharing)<br>
 LiDAR, IMU, 초음파 센서 : ``bagfiles`` 디렉터리 참고
+
+## 7. 코드 다운로드 방법
+### 터미널을 통해 다운로드
+#### 1. 터미널을 열고, 파일을 담을 디렉터리 생성
+```
+mkdir kookmin_ws
+cd kookmin_ws/
+```
+
+#### 2. 현재 레포지토리를 clone
+```
+git clone https://github.com/jhforstudy/2022_HEVEN_Kookmin_AutoCon.git
+```
+
+#### 3. clone한 폴더의 이름을 "src"로 변경 (패키지를 빌드하기 위해)
+```
+mv 2022_HEVEN_Kookmin_AutoCon/ src
+```
+
+#### 4. 패키지 빌드
+```
+catkin_make
+```
+
+### gitkraken을 이용해 다운로드
+git 협업을 위해 gitkraken을 이용하는 것을 추천드립니다.
