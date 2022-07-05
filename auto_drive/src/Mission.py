@@ -1,17 +1,14 @@
 from Database import Database
-from abc import abstractclassmethod, ABCMeta
 
-class Mission(metaclass=ABCMeta):
-    def __init__(self, db: Database):
+class Mission():
+    def __init__(self, db):
         self.db = db
         self.key = None
     
-    @abstractclassmethod
-    def main(self): # 미션 수행 함수
+    def main(self):
         pass
     
-    @abstractclassmethod
-    def mission_end(self): # 탈출조건 검사 함수
+    def mission_end(self):
         pass
 
     def __str__(self):

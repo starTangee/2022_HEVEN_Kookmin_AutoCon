@@ -16,10 +16,10 @@ WIDTH, HEIGHT = 640, 480
 
 class Database():
     def __init__(self, camera=True, imu=True, lidar=True, ultra=True):
+        # init node
+        rospy.init_node('sensor_node')
         rospy.loginfo("---Initializing sensor node---\n\n\n")
         time.sleep(1)
-        # init node
-        rospy.init_node('sensor_node', anonymous=True)
         # sensor subscriber
         if camera: rospy.Subscriber("/usb_cam/image_raw/", Image, self.img_callback)
         if imu: rospy.Subscriber("imu", Imu, self.imu_callback)

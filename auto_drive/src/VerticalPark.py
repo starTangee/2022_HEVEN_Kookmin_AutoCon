@@ -6,8 +6,8 @@ from Mission import Mission
 from Database import Database
 
 
-# cross_walk
-class Crosswalk(Mission):
+# vertical_park
+class VerticalPark(Mission):
     def __init__(self, db):
         self.db = db
         self.key = None
@@ -52,7 +52,7 @@ class Crosswalk(Mission):
 
 if __name__ == "__main__":
     db = Database()
-    crosswalk_mission = Crosswalk(db)
+    vertical_park_mission = VerticalPark(db)
     while not rospy.is_shutdown():
-        car_angle, car_speed = crosswalk_mission.main()
+        car_angle, car_speed = vertical_park_mission.main()
         print(car_angle, car_speed)
