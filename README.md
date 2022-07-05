@@ -39,6 +39,7 @@ TBC
 
 ## 6. 센서별 rosbag 파일
 
+전체 topic : [다운로드](https://drive.google.com/file/d/1zYe41KHswYv624GXP2kvyO-sSJY2vfbh/view?usp=sharing)<br>
 카메라 : [다운로드](https://drive.google.com/file/d/19e_oFJ1TOnnhaJg_sLq5L76Wk2-rTS7m/view?usp=sharing)<br>
 LiDAR, IMU, 초음파 센서 : ``bagfiles`` 디렉터리 참고
 
@@ -67,5 +68,3 @@ catkin_make
 
 ### gitkraken을 이용해 다운로드
 git 협업을 위해 gitkraken을 이용하는 것을 추천드립니다.
-
-### adadadadad
