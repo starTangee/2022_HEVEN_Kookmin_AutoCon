@@ -29,21 +29,7 @@
 
 [5회 자율주행경진대회-본선-안내.pdf](https://github.com/jhforstudy/2022_HEVEN_Kookmin_AutoCon/files/9040246/5.-.-.pdf)
 
-## 4. 실행 방법
-
-TBC
-
-## 5. 센서별 호출 방법
-
-TBC
-
-## 6. 센서별 rosbag 파일
-
-전체 topic : [다운로드](https://drive.google.com/file/d/1zYe41KHswYv624GXP2kvyO-sSJY2vfbh/view?usp=sharing)<br>
-카메라 : [다운로드](https://drive.google.com/file/d/19e_oFJ1TOnnhaJg_sLq5L76Wk2-rTS7m/view?usp=sharing)<br>
-LiDAR, IMU, 초음파 센서 : ``bagfiles`` 디렉터리 참고
-
-## 7. 코드 다운로드 방법
+## 4. 코드 다운로드 방법
 ### 터미널을 통해 다운로드
 #### 1. 터미널을 열고, 파일을 담을 디렉터리 생성
 ```
@@ -66,5 +52,47 @@ mv 2022_HEVEN_Kookmin_AutoCon/ src
 catkin_make
 ```
 
-### gitkraken을 이용해 다운로드
-git 협업을 위해 gitkraken을 이용하는 것을 추천드립니다.
+### 혹은 gitkraken을 이용해 다운로드
+github 협업을 위해 gitkraken을 이용해 다운로드 받는것을 추천드립니다.
+
+## 5. 실행 방법
+
+#### main.py 실행
+terminal 1
+```
+roscore
+```
+terminal 2
+```
+cd kookmin_ws/
+source devel/setup.bash
+rosrun auto_drive main.py
+```
+#### 미션별 .py 실행
+terminal 1
+```
+roscore
+```
+terminal 2
+```
+cd kookmin_ws/
+source devel/setup.bash
+rosrun auto_drive Crosswalk.py
+```
+
+## 6. 센서별 호출 방법
+
+미션별 클래스를 생성할 때 Database 클래스를 받아서 만들어집니다.<br>
+이 Database 클래스에서 아래와 같은 방식으로 센서값을 받아 사용하면 됩니다.
+```python
+lidar_data = self.db.lidar_data
+imu_data = self.db.imu_data
+cam_data = self.db.camera_data
+ultra_data = self.db.ultra_data
+```
+
+## 7. 센서별 rosbag 파일
+
+전체 topic : [다운로드](https://drive.google.com/file/d/1zYe41KHswYv624GXP2kvyO-sSJY2vfbh/view?usp=sharing)<br>
+카메라 : [다운로드](https://drive.google.com/file/d/19e_oFJ1TOnnhaJg_sLq5L76Wk2-rTS7m/view?usp=sharing)<br>
+LiDAR, IMU, 초음파 센서 : ``bagfiles`` 디렉터리 참고
