@@ -57,6 +57,13 @@ github 협업을 위해 gitkraken을 이용해 다운로드 받는것을 추천�
 
 ## 5. 테스트 방법
 
+#### launch 파일 실행
+```
+cd kookmin_ws/
+source devel/setup.bash
+roslaunch auto_drive start.launch
+```
+
 #### main.py 실행
 terminal 1
 ```
