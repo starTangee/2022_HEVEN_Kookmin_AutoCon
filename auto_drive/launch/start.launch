@@ -1,0 +1,10 @@
+<launch>
+  <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
+  <include file="$(find usb_cam)/launch/xycar_cam_viewer.launch"/>
+  <include file="$(find xycar_imu)/launch/xycar_imu_rviz.launch"/>
+  <include file="$(find xycar_lidar)/launch/xycar_lidar_rviz.launch"/>
+  <include file="$(find xycar_ultrasonic)/launch/xycar_ultrasonic_viewer.launch"/>
+
+  <node pkg="auto_drive" type="main.py" name="main_node" output="screen" />
+
+</launch>

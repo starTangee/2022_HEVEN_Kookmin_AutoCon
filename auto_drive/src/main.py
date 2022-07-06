@@ -26,7 +26,7 @@ def main():
     # Initialize database
     db = Database(camera=True, imu=True, lidar=True, ultra=True)
     # Initialize ROS
-    rate = rospy.Rate(100)
+    rate = rospy.Rate(50)
     xycar_pub = rospy.Publisher('xycar_motor', xycar_motor, queue_size=1)
     print("---Initializing mission manager---\n\n\n")
     time.sleep(1)
@@ -58,7 +58,9 @@ def main():
     while not rospy.is_shutdown():
         # return the speed and angle
         angle, speed = mission_manager.main()
+        # Publish control data
         xycar_pub.publish(drive(angle, speed))
+        rospy.loginfo("Current Mission: %s | speed: %d | angle: %d", mission_manager.current_mission_key, speed, angle)
         # wait
         rate.sleep()
 
