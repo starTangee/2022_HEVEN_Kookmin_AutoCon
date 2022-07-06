@@ -55,7 +55,7 @@ catkin_make
 ### 혹은 gitkraken을 이용해 다운로드
 github 협업을 위해 gitkraken을 이용해 다운로드 받는것을 추천드립니다.
 
-## 5. 실행 방법
+## 5. 테스트 방법
 
 #### main.py 실행
 terminal 1
@@ -63,6 +63,11 @@ terminal 1
 roscore
 ```
 terminal 2
+```
+cd kookmin_ws/src/bagfiles
+rosbag play all_topics.bag
+```
+terminal 3
 ```
 cd kookmin_ws/
 source devel/setup.bash
@@ -74,6 +79,11 @@ terminal 1
 roscore
 ```
 terminal 2
+```
+cd kookmin_ws/src/bagfiles
+rosbag play all_topics.bag
+```
+terminal 3
 ```
 cd kookmin_ws/
 source devel/setup.bash
