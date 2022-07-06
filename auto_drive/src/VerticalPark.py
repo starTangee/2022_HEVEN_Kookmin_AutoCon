@@ -53,6 +53,8 @@ class VerticalPark(Mission):
 if __name__ == "__main__":
     db = Database()
     vertical_park_mission = VerticalPark(db)
+    rate = rospy.Rate(100)
     while not rospy.is_shutdown():
         car_angle, car_speed = vertical_park_mission.main()
         print(car_angle, car_speed)
+        rate.sleep()

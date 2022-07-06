@@ -4,12 +4,14 @@ import rospy
 
 from Mission import Mission
 from Database import Database
+from Lanetracking import Lanetracking
 
 
 # obstacle
 class Obstacle(Mission):
-    def __init__(self, db):
+    def __init__(self, db, lane_track):
         self.db = db
+        self.lane_track = lane_track
         self.key = None
     
     def main(self):
@@ -27,6 +29,7 @@ class Obstacle(Mission):
             # finally derive the angle & speed of a car
             return angle, speed
         '''
+        self.lane_track.main()
         angle = 0
         speed = 10
         return angle, speed
@@ -52,7 +55,10 @@ class Obstacle(Mission):
 
 if __name__ == "__main__":
     db = Database()
-    obstacle_mission = Obstacle(db)
+    lane_track = Lanetracking(db)
+    obstacle_mission = Obstacle(db, lane_track)
+    rate = rospy.Rate(100)
     while not rospy.is_shutdown():
         car_angle, car_speed = obstacle_mission.main()
         print(car_angle, car_speed)
+        rate.sleep()

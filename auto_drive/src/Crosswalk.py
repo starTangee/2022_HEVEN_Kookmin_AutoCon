@@ -4,12 +4,14 @@ import rospy
 
 from Mission import Mission
 from Database import Database
+from Lanetracking import Lanetracking
 
 
 # cross_walk
 class Crosswalk(Mission):
-    def __init__(self, db):
+    def __init__(self, db, lane_track):
         self.db = db
+        self.lane_track = lane_track
         self.key = None
     
     def main(self):
@@ -27,6 +29,7 @@ class Crosswalk(Mission):
             # finally derive the angle & speed of a car
             return angle, speed
         '''
+        self.lane_track.main()
         angle = 0
         speed = 10
         return angle, speed
@@ -52,7 +55,10 @@ class Crosswalk(Mission):
 
 if __name__ == "__main__":
     db = Database()
-    crosswalk_mission = Crosswalk(db)
+    lane_track = Lanetracking(db)
+    crosswalk_mission = Crosswalk(db, lane_track)
+    rate = rospy.Rate(100)
     while not rospy.is_shutdown():
         car_angle, car_speed = crosswalk_mission.main()
         print(car_angle, car_speed)
+        rate.sleep()

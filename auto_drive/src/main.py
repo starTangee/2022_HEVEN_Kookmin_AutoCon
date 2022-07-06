@@ -7,6 +7,8 @@ from Database import Database
 from xycar_msgs.msg import xycar_motor
 # MissionManager
 from MissionManager import MissionManager
+# LaneTracker
+from Lanetracking import Lanetracking
 # Missions
 from Crosswalk import Crosswalk
 from VerticalPark import VerticalPark
@@ -24,7 +26,7 @@ def main():
     # Initialize database
     db = Database(camera=True, imu=True, lidar=True, ultra=True)
     # Initialize ROS
-    rate = rospy.Rate(10)
+    rate = rospy.Rate(100)
     xycar_pub = rospy.Publisher('xycar_motor', xycar_motor, queue_size=1)
     print("---Initializing mission manager---\n\n\n")
     time.sleep(1)
@@ -36,11 +38,13 @@ def main():
     # Initialize mission data
     mission_manager.mission_idx = 0
     mission_manager.current_mission_key = mission_manager.mission_keys[mission_manager.mission_idx]
+    # Initialize LaneTracker
+    lane_tracker = Lanetracking(db=db)
     # Initialize Missions
-    crosswalk_mission = Crosswalk(db=db)
+    crosswalk_mission = Crosswalk(db=db, lane_track=lane_tracker)
     vertical_park_mission = VerticalPark(db=db)
     parallel_park_mission = ParallelPark(db=db)
-    obstacle_mission = Obstacle(db=db)
+    obstacle_mission = Obstacle(db=db, lane_track=lane_tracker)
     tunnel_mission = Tunnel(db=db)
     # Add missions to mission_manager
     mission_manager.add_mission(key="CrossWalk", mission=crosswalk_mission)

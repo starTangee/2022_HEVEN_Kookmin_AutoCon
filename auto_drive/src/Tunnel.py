@@ -53,6 +53,8 @@ class Tunnel(Mission):
 if __name__ == "__main__":
     db = Database()
     tunnel_mission = Tunnel(db)
+    rate = rospy.Rate(100)
     while not rospy.is_shutdown():
         car_angle, car_speed = tunnel_mission.main()
         print(car_angle, car_speed)
+        rate.sleep()

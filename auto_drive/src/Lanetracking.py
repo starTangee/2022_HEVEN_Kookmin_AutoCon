@@ -1,16 +1,14 @@
 #!/usr/bin/env python
 
 import rospy
+import cv2
+import time
 
-from Mission import Mission
 from Database import Database
 
-
-# parallel_park
-class ParallelPark(Mission):
+class Lanetracking():
     def __init__(self, db):
         self.db = db
-        self.key = None
     
     def main(self):
         '''
@@ -27,34 +25,18 @@ class ParallelPark(Mission):
             # finally derive the angle & speed of a car
             return angle, speed
         '''
+        cam_data = self.db.camera_data
+        cv2.imshow("camera", cam_data)
+        cv2.waitKey(1)
         angle = 0
         speed = 10
+
         return angle, speed
-    
-    def mission_end(self):
-        '''     
-        if mission_is_done:
-            return True
-        else:
-            return False
-        '''
-        return False
-
-    def example_function(self):
-        pass
-
-    def __str__(self):
-        if self.key is None:
-            return "None"
-        else:
-            return self.key + " Mission"
-
 
 if __name__ == "__main__":
     db = Database()
-    parallel_park_mission = ParallelPark(db)
+    lane_tracking = Lanetracking(db)
     rate = rospy.Rate(100)
     while not rospy.is_shutdown():
-        car_angle, car_speed = parallel_park_mission.main()
-        print(car_angle, car_speed)
+        car_angle, car_speed = lane_tracking.main()
         rate.sleep()
